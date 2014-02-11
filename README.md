@@ -131,9 +131,10 @@ This is equivalent to running each task in its own `clojure.core/future`.
 ```
 
 You can also pass the keyword `:serial` as a threadpool. In that case, the
-function will be run eagerly in serial, not in parallel, so the parallel
-function will not return until all the work is done. We find this is helpful
-for testing and benchmarking. (See also about `*parallel*` below.)
+function will be run eagerly in series in the calling thread, not in parallel,
+so the parallel function will not return until all the work is done. We find
+this is helpful for testing and benchmarking. (See also about `*parallel*`
+below.)
 
 ```clojure
 ;; Use no parallelism at all; blocks until all work is complete.
@@ -180,7 +181,7 @@ and their priority.
 ## How can I disable threading?
 
 We have found that benchmarking and some other tests are most easily done in
-serial. You can do that in one of two ways.
+series. You can do that in one of two ways.
 
 First, you can just pass the keyword `:serial` to a parallel function.
 
@@ -194,7 +195,7 @@ like so:
 ```clojure
 (binding [cp/*parallel* false]
   (with-shutdown! [pool (cp/threadpool 2)]
-    ;; This is in serial!
+    ;; This is in series; we block until all work is complete!
     (cp/pmap pool myfn inputs)))
 ```
 
