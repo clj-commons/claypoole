@@ -1,6 +1,6 @@
 # Claypoole: Threadpool tools for Clojure
 
-The claypoole library provides threadpool-based paralell versions of Clojure
+The claypoole library provides threadpool-based parallel versions of Clojure
 functions such as `pmap`, `future`, and `for`.
 
 Claypoole is available in the Clojars repository. Just use this leiningen
