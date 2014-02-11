@@ -1,6 +1,10 @@
 pom.xml
-*jar
-/lib/
+*.jar
+.*.swp
+.lein-failures
+.lein-repl-history
+.nrepl-port
 /classes/
-/targets/
+/lib/
+/target/
 .lein-deps-sum
