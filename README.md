@@ -202,8 +202,8 @@ like so:
 
 ## Why the name "Claypoole"?
 
-The claypoole library is named after [John
-Claypoole](http://en.wikipedia.org/wiki/Betsy_Ross) for reasons that are at
+The claypoole library is named after [John Claypoole (Betsy Ross's third
+husband)](http://en.wikipedia.org/wiki/Betsy_Ross) for reasons that are at
 best obscure.
 
 ## License
