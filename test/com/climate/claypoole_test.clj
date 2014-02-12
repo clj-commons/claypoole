@@ -118,6 +118,32 @@
           (Thread/sleep 5)
           (is (.isDone @@fp))
           (is (thrown? ExecutionException (deref @@fp)))))))
+  (testing "With-shutdown! works with any number of threadpools"
+    (let [input (range 100)]
+      (is (= input
+             (cp/with-shutdown! []
+               (map identity input))))
+      (is (= input
+             (cp/with-shutdown! [p1 4]
+               (->> input
+                    (cp/pmap p1 identity)
+                    doall))))
+      (is (= input
+             (cp/with-shutdown! [p1 4
+                                 p2 3]
+               (->> input
+                    (cp/pmap p1 identity)
+                    (cp/pmap p2 identity)
+                    doall))))
+      (is (= input
+             (cp/with-shutdown! [p1 4
+                                 p2 3
+                                 p3 5]
+               (->> input
+                    (cp/pmap p1 identity)
+                    (cp/pmap p2 identity)
+                    (cp/pmap p3 identity)
+                    doall))))))
   (testing "Invalid with-shutdown! arguments"
     (is (thrown? IllegalArgumentException
                  (cp/with-shutdown! [pool 1.5] nil)))

@@ -79,17 +79,18 @@ possible.
 
 ```clojure
 (require '[com.climate.claypoole :as cp])
-(def net-pool (cp/threadpool 100))
-(def cpu-pool (cp/threadpool (cp/ncpus)))
-;; Unordered pmap doesn't return output in the same order as the input(!), but
-;; that means we can start using service2 as soon as possible.
-(def service1-responses (cp/upmap net-pool service1-request myinputs))
-(def service2-responses (cp/upmap net-pool service2-request service1-responses))
-(def results (cp/upmap cpu-pool handle-response service2-responses))
-;; ...eventually...
-;; The JVM doesn't automatically clean up threads for us.
-(cp/shutdown net-pool)
-(cp/shutdown cpu-pool)
+;; We'll use the with-shutdown! form to guarantee that pools are cleaned up.
+(cp/with-shutdown! [net-pool (cp/threadpool 100)
+                    cpu-pool (cp/threadpool (cp/ncpus))]
+  ;; Unordered pmap doesn't return output in the same order as the input(!),
+  ;; but that means we can start using service2 as soon as possible.
+  (def service1-resps (cp/upmap net-pool service1-request myinputs))
+  (def service2-resps (cp/upmap net-pool service2-request service1-resps))
+  (def results (cp/upmap cpu-pool handle-response service2-resps))
+  ;; ...eventually...
+  ;; Make sure we make sure the computation is complete before we shutdown the
+  ;; pools.
+  (doall results))
 ```
 
 Claypoole provides ordered and unordered parallel `for` macros. Note that only

@@ -96,8 +96,9 @@
 
       (with-shutdown! [pool (theadpool 6)]
         (doall (pmap pool identity (range 1000))))
-      (with-shutdown! [pool 6]
-        (doall (pmap pool identity (range 1000))))
+      (with-shutdown! [pool1 6
+                       pool2 :serial]
+        (doall (pmap pool1 identity (range 1000))))
 
   Bad example:
 
@@ -105,14 +106,20 @@
         ;; Some of these tasks may be killed!
         (pmap pool identity (range 1000)))
   "
-  [[pool-sym pool-init] & body]
-  `(let [pool-init# ~pool-init]
-     (let [[_# ~pool-sym] (impl/->threadpool pool-init#)]
-       (try
-         ~@body
-         (finally
-           (when (threadpool? ~pool-sym)
-             (shutdown! ~pool-sym)))))))
+  [pool-syms-and-inits & body]
+  (when-not (even? (count pool-syms-and-inits))
+    (throw (IllegalArgumentException.
+             "with-shutdown! requires an even number of binding forms")))
+  (if (empty? pool-syms-and-inits)
+    `(do ~@body)
+    (let [[pool-sym pool-init & more] pool-syms-and-inits]
+      `(let [pool-init# ~pool-init
+             [_# ~pool-sym] (impl/->threadpool pool-init#)]
+         (try
+           (with-shutdown! ~more ~@body)
+           (finally
+             (when (threadpool? ~pool-sym)
+               (shutdown! ~pool-sym))))))))
 
 (defn- serial?
   "Check if we should run this computation in serial."
