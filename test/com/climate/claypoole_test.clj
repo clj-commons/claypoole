@@ -118,7 +118,7 @@
   (testing "with-priority-fn works for simple upmap"
     (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
       (let [start (promise)
-            results (cp/upmap (cp/with-priority-fn pool identity)
+            results (cp/upmap (cp/with-priority-fn pool first)
                               (fn [i]
                                 (deref start)
                                 i)
@@ -131,12 +131,14 @@
     (cp/with-shutdown! [pool (cp/priority-threadpool 2)]
       (is (thrown-with-msg?
             Exception #"Priority function exception"
-            (cp/pmap (cp/with-priority-fn pool identity)
+            ;; Arity exception.
+            (cp/pmap (cp/with-priority-fn pool (fn [] 0))
                      (fn [x y] (+ x y))
                      (range 10) (range 10))))
       (is (thrown-with-msg?
+            ;; No arguments passed to priority function.
             Exception #"Priority function exception"
-            (cp/future (cp/with-priority-fn pool identity)
+            (cp/future (cp/with-priority-fn pool first)
                        1))))))
 
 (deftest test-for-priority

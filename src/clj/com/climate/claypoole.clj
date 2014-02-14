@@ -344,7 +344,7 @@
     ;; If there's a priority, God help us--let's pull that thing out.
     (let [bindings* (vec (drop-last 2 bindings))
           priority-value (last bindings)]
-      `(let [pool# (with-priority-fn ~pool (fn [_# p#] p#))
+      `(let [pool# (with-priority-fn ~pool second)
              [fns# priorities#] (apply map vector
                                        (for ~bindings*
                                          [(fn [priority#] ~@body)

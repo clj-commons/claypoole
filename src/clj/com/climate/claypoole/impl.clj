@@ -152,7 +152,7 @@
   ExecutionException anyway."
   [task, ^IFn priority-fn]
   (let [priority (try
-                   (long (apply priority-fn (-> task meta :args)))
+                   (long (priority-fn (-> task meta :args)))
                    (catch Exception e
                      (throw (ExecutionException.
                               "Priority function exception" e))))]
