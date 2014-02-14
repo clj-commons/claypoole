@@ -205,7 +205,7 @@
       ;; Read results as available.
       (concat (map deref futures)
               ;; Deref the reading future to get its exceptions, if it had any.
-              @read-future))))
+              (lazy-seq (deref read-future))))))
 
 (defn upmap
   "Like pmap, except the return value is a sequence of results ordered by
@@ -228,7 +228,7 @@
       ;; Read results as available.
       (concat (for [_ args] (-> q .take deref))
               ;; Deref the reading future to get its exceptions, if it had any.
-              @read-future))))
+              (lazy-seq (deref read-future))))))
 
 (defn pcalls
   "Like clojure.core.pcalls, except it takes a threadpool. For more detail on

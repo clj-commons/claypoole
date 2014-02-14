@@ -64,15 +64,15 @@
           result (promise)
           f (.submit pool #(deliver result (deref start)))]
       (is (false? (cp/shutdown? pool)))
-      (Thread/sleep 5)
+      (Thread/sleep 50)
       ;; Make sure the threadpool starts shutting down but doesn't complete
       ;; until the threads finish.
       (cp/shutdown pool)
       (is (true? (cp/shutdown? pool)))
       (is (false? (.isTerminated pool)))
-      (Thread/sleep 5)
+      (Thread/sleep 50)
       (deliver start true)
-      (Thread/sleep 5)
+      (Thread/sleep 50)
       (is (true? (.isTerminated pool)))
       (is (true? @result))))
   (testing "Shutdown does not affect builtin threadpool"
@@ -85,12 +85,12 @@
           start (promise)
           f (.submit pool #(deref start))]
       (is (false? (cp/shutdown? pool)))
-      (Thread/sleep 5)
+      (Thread/sleep 50)
       ;; Make sure the threadpool completes shutting down immediately.
       (cp/shutdown! pool)
       (is (true? (cp/shutdown? pool)))
       ;; It can take some time for the threadpool to kill the threads.
-      (Thread/sleep 5)
+      (Thread/sleep 50)
       (is (true? (.isTerminated pool)))
       (is (.isDone f))
       (is (thrown? ExecutionException (deref f)))))
@@ -108,14 +108,14 @@
           (deliver outside-pool pool)
           ;; Use a future to avoid blocking on the :serial case.
           (deliver fp (future (.submit pool #(deref start))))
-          (Thread/sleep 5))
+          (Thread/sleep 50))
         ;; Make sure outside of the with-shutdown block the pool is properly
         ;; killed.
         (when-not (keyword? arg) (is (true? (cp/shutdown? @outside-pool)))
-          (Thread/sleep 5)
+          (Thread/sleep 50)
           (is (true? (.isTerminated @outside-pool)))
           (deliver start true)
-          (Thread/sleep 5)
+          (Thread/sleep 50)
           (is (.isDone @@fp))
           (is (thrown? ExecutionException (deref @@fp)))))))
   (testing "Invalid with-shutdown! arguments"
@@ -172,6 +172,30 @@
                          ;; to see them return as available, so in sorted
                          ;; order.
                          (sort input))))))))
+
+(defn check-lazy-read
+  "Check that a pmap function reads lazily"
+  [pmap-like]
+  (let [n 10]
+    (cp/with-shutdown! [pool n]
+      (let [pool (cp/threadpool n)
+            first-inputs (range n)
+            second-inputs (range n (* n 2))
+            ;; The input will have a pause after n items.
+            pause (promise)
+            input (concat first-inputs (map deref [pause]) second-inputs)
+            ;; We'll record what tasks have been started so we can make sure
+            ;; all of them are started.
+            started (atom #{})
+            results (pmap-like pool
+                               (fn [i] (swap! started conj i) i)
+                               input)]
+        ;; All of the first set of tasks should have started after 50ms.
+        (Thread/sleep 50)
+        (is (= @started (set first-inputs)))
+        (deliver pause (- n 0.5))
+        (Thread/sleep 50)
+        (is (= @started (set results) (set input)))))))
 
 (defn check-fn-exception
   "Check that a pmap function correctly passes exceptions caused by the
@@ -268,7 +292,7 @@
           ;; Check the results
           (is (= (map inc inputs) (sort @results)))
           ;; Wait for the thread to be shutdown.
-          (Thread/sleep 5)
+          (Thread/sleep 50)
           (when should-be-shutdown?
             (is (true? (cp/shutdown? @apool))))
           (when should-we-shutdown?
@@ -331,13 +355,17 @@
   (testing "basic pmap test"
     (cp/with-shutdown! [pool 3]
       (is (= (range 1 11) (cp/pmap pool inc (range 10))))))
-  (check-all "pmap" cp/pmap true))
+  (check-all "pmap" cp/pmap true)
+  (testing "pmap reads lazily"
+    (check-lazy-read cp/pmap)))
 
 (deftest test-upmap
   (testing "basic upmap test"
     (cp/with-shutdown! [pool 3]
       (is (= (range 1 11) (sort (cp/upmap pool inc (range 10)))))))
-  (check-all "upmap" cp/upmap false))
+  (check-all "upmap" cp/upmap false)
+  (testing "upmap reads lazily"
+    (check-lazy-read cp/upmap)))
 
 (deftest test-pcalls
   (testing "basic pcalls test"
@@ -407,7 +435,9 @@
               pool
               [i input]
               (work i)))]
-    (check-all "pfor" pmap-like true)))
+    (check-all "pfor" pmap-like true)
+    (testing "pfor reads lazily"
+      (check-lazy-read pmap-like))))
 
 (deftest test-upfor
   (testing "basic upfor test"
@@ -419,4 +449,6 @@
               pool
               [i input]
               (work i)))]
-    (check-all "upfor" pmap-like false)))
+    (check-all "upfor" pmap-like false)
+    (testing "upfor reads lazily"
+      (check-lazy-read pmap-like))))
