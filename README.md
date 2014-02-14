@@ -88,8 +88,7 @@ possible.
   (def service2-resps (cp/upmap net-pool service2-request service1-resps))
   (def results (cp/upmap cpu-pool handle-response service2-resps))
   ;; ...eventually...
-  ;; Make sure we make sure the computation is complete before we shutdown the
-  ;; pools.
+  ;; Make sure sure the computation is complete before we shutdown the pools.
   (doall results))
 ```
 
@@ -109,7 +108,8 @@ binding will be done in the calling thread.
 ```
 
 Claypoole also lets you prioritize your backlog of tasks. Higher-priority tasks
-will be assigned to threads first. See advanced usage in a section below.
+will be assigned to threads first. Here's an example; there is a more detailed
+description below.
 
 ```clojure
 (def pool (cp/priority-threadpool 10))
@@ -180,8 +180,10 @@ exits. You can create a daemon threadpool via:
 
 To construct a threadpool, use the `threadpool` function. It takes optional
 keyword arguments allowing you to change the thread names, their daemon status,
-and their priority. (NOTE: Thread priority is a system-level thing that depends
-on the OS; it is not the same as the task priority, described below.)
+and their priority. (NOTE: Thread priority is [a system-level property that
+depends on the
+OS](http://oreilly.com/catalog/expjava/excerpt/#EXJ-CH-6-SECT-4); it is not the
+same as the task priority, described below.)
 
 ```clojure
 (def pool (cp/threadpool (cp/ncpus)
@@ -213,7 +215,7 @@ like so:
 
 ## How can I prioritize my tasks?
 
-You can create a threadpool that respects priorities by creating a
+You can create a threadpool that respects task priorities by creating a
 `priority-threadpool`:
 
 ```clojure
