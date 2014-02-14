@@ -228,7 +228,7 @@ of your tasks:
 
 ```clojure
 (cp/future (cp/with-priority p1 100) (myfn))
-;; Nothing bad happens if you nest with-priority. The outermost one "wins";
+;; Nothing bad happens if you nest with-priority. The innermost one "wins";
 ;; this task runs at priority 2.
 (cp/future (cp/with-priority (cp-with-priority p1 1) 2) (myfn))
 ;; For pmaps, you can use a priority function. This will run 3 tasks at
