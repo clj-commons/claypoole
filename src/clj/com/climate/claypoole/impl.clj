@@ -16,7 +16,17 @@
   (:require
     [clojure.core :as core])
   (:import
+    [clojure.lang
+     IFn]
+    [com.climate.claypoole.impl
+     Prioritized
+     PriorityThreadpoolImpl]
+    [java.util
+     Collection
+     Comparator
+     List]
     [java.util.concurrent
+     ExecutionException
      Executors
      ExecutorService
      Future
@@ -26,12 +36,15 @@
 
 
 (defn binding-conveyor-fn
-  "Like clojure.core/binding-conveyor-fn."
+  "Like clojure.core/binding-conveyor-fn for resetting bindings to run a
+  function in another thread."
   [f]
   (let [frame (clojure.lang.Var/cloneThreadBindingFrame)]
-    (fn []
-      (clojure.lang.Var/resetThreadBindingFrame frame)
-      (f))))
+    (with-meta
+      (fn []
+        (clojure.lang.Var/resetThreadBindingFrame frame)
+        (f))
+      (meta f))))
 
 (defn deref-future
   "Like clojure.core/deref-future."
@@ -85,6 +98,13 @@
   []
   (format "claypoole-%d" (swap! threadpool-id inc)))
 
+(defn apply-map
+  "Apply a function that takes keyword arguments to a map of arguments."
+  [f & args]
+  (let [args (drop-last args)
+        arg-map (last args)]
+    (apply f (concat args (mapcat identity arg-map)))))
+
 (defn thread-factory
   "Create a ThreadFactory with options including thread daemon status, the
   thread name format (a string for format with one integer), and a thread
@@ -92,7 +112,8 @@
   ^ThreadFactory [& {:keys [daemon thread-priority] pool-name :name}]
   (let [daemon* (boolean daemon)
         pool-name* (or pool-name (default-threadpool-name))
-        thread-priority* (or thread-priority (.getPriority (Thread/currentThread)))]
+        thread-priority* (or thread-priority
+                             (.getPriority (Thread/currentThread)))]
     (let [default-factory (Executors/defaultThreadFactory)
           ;; The previously-used thread ID. Start at -1 so we can just use the
           ;; return value of (swap! inc).
@@ -119,11 +140,57 @@
 
   See docs in com.climate.claypoole/threadpool.
   "
-  [n & {:keys [daemon thread-priority] pool-name :name}]
-  (let [factory (thread-factory :daemon daemon
-                                :name pool-name
-                                :thread-priority thread-priority)]
+  [n & args]
+  (let [factory (apply thread-factory args)]
     (Executors/newFixedThreadPool n factory)))
+
+(defn- prioritize
+  "Apply a priority function to a task.
+
+  Note that this re-throws all priority-fn exceptions as ExecutionExceptions.
+  That shouldn't mess anything up because the caller re-throws it as an
+  ExecutionException anyway."
+  [task, ^IFn priority-fn]
+  (let [priority (try
+                   (long (apply priority-fn (-> task meta :args)))
+                   (catch Exception e
+                     (throw (ExecutionException.
+                              "Priority function exception" e))))]
+    (reify
+      Callable
+      (call [_] (.call ^Callable task))
+      Runnable
+      (run [_] (.run ^Runnable task))
+      Prioritized
+      (getPriority [_] priority))))
+
+;; A Threadpool that has a priority function.
+(deftype PriorityThreadpool [^PriorityThreadpoolImpl pool, ^IFn priority-fn]
+  ExecutorService
+  (^boolean awaitTermination [_, ^long timeout, ^TimeUnit unit]
+    (.awaitTermination pool timeout unit))
+  (^List invokeAll [_, ^Collection tasks]
+    (.invokeAll pool tasks))
+  (^List invokeAll [_, ^Collection tasks, ^long timeout, ^TimeUnit unit]
+    (.invokeAll pool tasks timeout unit))
+  (^Object invokeAny [_, ^Collection tasks]
+    (.invokeAny pool tasks))
+  (^Object invokeAny [_, ^Collection tasks, ^long timeout, ^TimeUnit unit]
+    (.invokeAny pool tasks timeout unit))
+  (^boolean isShutdown [_]
+    (.isShutdown pool))
+  (^boolean isTerminated [_]
+    (.isTerminated pool))
+  (shutdown [_]
+    (.shutdown pool))
+  (^List shutdownNow [_]
+    (.shutdownNow pool))
+  (^Future submit [_, ^Runnable task]
+    (.submit pool ^Runnable (prioritize task priority-fn)))
+  (^Future submit [_, ^Runnable task, ^Object result]
+    (.submit pool ^Runnable (prioritize task priority-fn) result))
+  (^Future submit [_ ^Callable task]
+    (.submit pool ^Callable (prioritize task priority-fn))))
 
 (defn ->threadpool
   "Convert the argument into a threadpool, leaving the special keyword :serial

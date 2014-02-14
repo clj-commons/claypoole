@@ -108,6 +108,16 @@ binding will be done in the calling thread.
                   (myfn x y)))
 ```
 
+Claypoole also lets you prioritize your backlog of tasks. Higher-priority tasks
+will be assigned to threads first. See advanced usage in a section below.
+
+```clojure
+(def pool (cp/priority-threadpool 10))
+(def task1 (cp/future (cp/with-priority pool 1000) (myfn 1)))
+(def task2 (cp/future (cp/with-priority pool 0) (myfn 2)))
+(def moretasks (cp/pmap (cp/with-priority pool 10) myfn (range 3 10)))
+```
+
 ## Do I really need to manage all those threadpools?
 
 You don't need to specifically declare a threadpool. Instead, you can just give
@@ -170,7 +180,8 @@ exits. You can create a daemon threadpool via:
 
 To construct a threadpool, use the `threadpool` function. It takes optional
 keyword arguments allowing you to change the thread names, their daemon status,
-and their priority.
+and their priority. (NOTE: Thread priority is a system-level thing that depends
+on the OS; it is not the same as the task priority, described below.)
 
 ```clojure
 (def pool (cp/threadpool (cp/ncpus)
@@ -198,6 +209,34 @@ like so:
   (with-shutdown! [pool (cp/threadpool 2)]
     ;; This is in series; we block until all work is complete!
     (cp/pmap pool myfn inputs)))
+```
+
+## How can I prioritize my tasks?
+
+You can create a threadpool that respects priorities by creating a
+`priority-threadpool`:
+
+```clojure
+(def p1 (cp/priority-threadpool 5))
+(def p2 (cp/priority-threadpool 5 :default-priority -10))
+```
+
+Then, use functions `with-priority` and `with-priority-fn` to set the priority
+of your tasks:
+
+```clojure
+(cp/future (cp/with-priority p1 100) (myfn))
+;; Nothing bad happens if you nest with-priority. The outermost one "wins";
+;; this task runs at priority 2.
+(cp/future (cp/with-priority (cp-with-priority p1 1) 2) (myfn))
+;; For pmaps, you can use a priority function. This will run 3 tasks at
+priorities 6, 5, and 4, respectively.
+(cp/upmap (cp/with-priority-fn p1 (fn [x y] x) + [6 5 4] [1 2 3])
+;; For for loops, you can use the special :priority binding, which must be the
+;; last for binding.
+(cp/upfor p1 [i (range 10)
+              :priority (- i)]
+  (myfn i))
 ```
 
 ## Why the name "Claypoole"?

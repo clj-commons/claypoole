@@ -22,6 +22,28 @@
      ExecutorService]))
 
 
+(defn check-threadpool-options
+  [pool-constructor]
+  (cp/with-shutdown! [pool (pool-constructor 4)]
+    (dotimes [_ 8] (.submit pool #(inc 1)))
+    (let [factory (.getThreadFactory pool)
+          start (promise)
+          thread (.newThread factory #(deref start))]
+      (is (false? (.isDaemon thread)))
+      (is (not (empty? (re-find #"claypoole-[0-9]*-4" (.getName thread)))))
+      (is (= (.getPriority (Thread/currentThread)) (.getPriority thread)))))
+  (cp/with-shutdown! [pool (pool-constructor 4
+                                             :daemon true
+                                             :name "fiberpond"
+                                             :thread-priority 4)]
+    (dotimes [_ 8] (.submit pool #(inc 1)))
+    (let [factory (.getThreadFactory pool)
+          start (promise)
+          thread (.newThread factory #(deref start))]
+      (is (true? (.isDaemon thread)))
+      (is (= "fiberpond-4" (.getName thread)))
+      (is (= 4 (.getPriority thread))))))
+
 (deftest test-threadpool
   (testing "Basic threadpool creation"
     (cp/with-shutdown! [pool (cp/threadpool 4)]
@@ -29,30 +51,178 @@
       (dotimes [_ 8] (.submit pool #(inc 1)))
       (is (= 4 (.getPoolSize pool)))))
   (testing "Threadpool options"
-    (cp/with-shutdown! [pool (cp/threadpool 4)]
-      (dotimes [_ 8] (.submit pool #(inc 1)))
-      (let [factory (.getThreadFactory pool)
-            start (promise)
-            thread (.newThread factory #(deref start))]
-        (is (false? (.isDaemon thread)))
-        (is (not (empty? (re-find #"claypoole-[0-9]*-4" (.getName thread)))))
-        (is (= (.getPriority (Thread/currentThread)) (.getPriority thread)))))
-    (cp/with-shutdown! [pool (cp/threadpool 4
-                                            :daemon true
-                                            :name "fiberpond"
-                                            :thread-priority 4)]
-      (dotimes [_ 8] (.submit pool #(inc 1)))
-      (let [factory (.getThreadFactory pool)
-            start (promise)
-            thread (.newThread factory #(deref start))]
-        (is (true? (.isDaemon thread)))
-        (is (= "fiberpond-4" (.getName thread)))
-        (is (= 4 (.getPriority thread)))))))
+    (check-threadpool-options cp/threadpool)))
+
+(defn- sorted*?
+  "Is a sequence sorted?"
+  [x]
+  (= x (sort x)))
+
+(deftest test-priority-threadpool
+  (testing "Priority threadpool ordering is mostly in order"
+    (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
+      (let [start (promise)
+            completed (atom [])
+            tasks (doall
+                    (for [i (range 10)]
+                      (do
+                        (cp/future (cp/with-priority pool i)
+                                   (deref start)
+                                   (swap! completed conj i)))))]
+        ;; start tasks
+        (Thread/sleep 5)
+        (deliver start true)
+        ;; Wait for tasks to complete
+        (doseq [f tasks] (deref f))
+        (is (= [0 9 8 7 6 5 4 3 2 1]
+               @completed)))))
+  (testing "Priority threadpool ordering is ordered with unordered inputs."
+    (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
+      (let [start (promise)
+            completed (atom [])
+            tasks (doall
+                    (for [i (shuffle (range 100))]
+                      (cp/future (cp/with-priority pool i)
+                                 (deref start)
+                                 (swap! completed conj i))))]
+        ;; start tasks
+        (deliver start true)
+        ;; Wait for tasks to complete
+        (doseq [f tasks] (deref f))
+        (is (sorted*?
+              (-> completed
+                  deref
+                  ;; The first task will be one at random, so drop it
+                  rest
+                  reverse))))))
+  (testing "Priority threadpool default priority."
+    (cp/with-shutdown! [pool (cp/priority-threadpool 1 :default-priority 50)]
+      (let [start (promise)
+            completed (atom [])
+            run (fn [result] (deref start) (swap! completed conj result))
+            first-task (cp/future pool (run :first))
+            tasks (doall
+                    (for [i [1 100]]
+                      (cp/future (cp/with-priority pool i) (run i))))
+            default-task (cp/future pool (run :default))]
+        ;; start tasks
+        (deliver start true)
+        ;; Wait for tasks to complete
+        (doseq [f tasks] (deref f))
+        (deref default-task)
+        (is (= [:first 100 :default 1] @completed)))))
+  (testing "Priority threadpool options"
+    (check-threadpool-options cp/threadpool)))
+
+(deftest test-with-priority-fn
+  (testing "with-priority-fn works for simple upmap"
+    (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
+      (let [start (promise)
+            results (cp/upmap (cp/with-priority-fn pool identity)
+                              (fn [i]
+                                (deref start)
+                                i)
+                              (range 10))]
+        ;; start tasks
+        (deliver start true)
+        (is (= [0 9 8 7 6 5 4 3 2 1]
+               results)))))
+  (testing "with-priority-fn throws sensible exceptions"
+    (cp/with-shutdown! [pool (cp/priority-threadpool 2)]
+      (is (thrown-with-msg?
+            Exception #"Priority function exception"
+            (cp/pmap (cp/with-priority-fn pool identity)
+                     (fn [x y] (+ x y))
+                     (range 10) (range 10))))
+      (is (thrown-with-msg?
+            Exception #"Priority function exception"
+            (cp/future (cp/with-priority-fn pool identity)
+                       1))))))
+
+(deftest test-for-priority
+  (testing "pfor uses priority"
+    (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
+      (let [start (promise)
+            completed (atom [])
+            tasks (cp/pfor pool
+                    [i (range 100)
+                     :priority (inc i)]
+                    (deref start)
+                    (swap! completed conj i)
+                    i)]
+        (Thread/sleep 5)
+        (deliver start true)
+        (dorun tasks)
+        ;; Just worry about the rest of the tasks; the first one may be out of
+        ;; order.
+        (is (sorted*? (reverse (rest @completed))))
+        (is (= (range 100) tasks)))))
+  (testing "upfor uses priority"
+    (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
+      (let [start (promise)
+            completed (atom [])
+            tasks (cp/upfor pool
+                    [i (range 100)
+                     :priority (inc i)]
+                    (deref start)
+                    (swap! completed conj i)
+                    i)]
+        (Thread/sleep 5)
+        (deliver start true)
+        (dorun tasks)
+        ;; Just worry about the rest of the tasks; the first one may be out of
+        ;; order.
+        (is (sorted*? (reverse (rest @completed))))
+        (is (= @completed tasks))))))
+
+(deftest test-priority-nonIObj
+  (testing "A priority pool should work on any sort of Callable."
+    (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
+      (let [start (promise)
+            results (atom [])
+            run (fn [x] (deref start) (swap! results conj x))]
+        ;; Dummy task, always runs first.
+        (cp/future (cp/with-priority pool 100)
+                   (run 100))
+        ;; Runnables.
+        (.submit (cp/with-priority pool 1)
+                 (reify Runnable (run [_] (run 1))))
+        (.submit (cp/with-priority pool 10)
+                 (reify Runnable (run [_] (run 10))))
+        ;; Runnables with return value.
+        (.submit (cp/with-priority pool 2)
+                 (reify Runnable (run [_] (run 2)))
+                 :return-value)
+        (.submit (cp/with-priority pool 9)
+                 (reify Runnable (run [_] (run 9)))
+                 :return-value)
+        (cp/future (cp/with-priority pool 6)
+                   (run 6))
+        (cp/future (cp/with-priority pool 11)
+                   (run 11))
+        ;; Callables
+        (.submit (cp/with-priority pool 3)
+                 (reify Callable (call [_] (run 3))))
+        (.submit (cp/with-priority pool 8)
+                 (reify Callable (call [_] (run 8))))
+        ;; And another couple IFns for good measure
+        (cp/future (cp/with-priority pool 5)
+                   (run 5))
+        (cp/future (cp/with-priority pool 7)
+                   (run 7))
+        ;; Make them go.
+        (Thread/sleep 5)
+        (deliver start true)
+        ;; Check the results
+        (Thread/sleep 5)
+        (is (sorted*? (reverse @results)))))))
 
 (deftest test-threadpool?
   (testing "Basic threadpool?"
-    (cp/with-shutdown! [pool 4]
+    (cp/with-shutdown! [pool 4
+                        priority-pool (cp/priority-threadpool 4)]
       (is (true? (cp/threadpool? pool)))
+      (is (true? (cp/threadpool? priority-pool)))
       (is (false? (cp/threadpool? :serial)))
       (is (false? (cp/threadpool? nil)))
       (is (false? (cp/threadpool? 1))))))

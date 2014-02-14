@@ -2,6 +2,7 @@ pom.xml
 *.jar
 .*.swp
 .lein-failures
+.lein-plugins
 .lein-repl-history
 .nrepl-port
 /classes/
