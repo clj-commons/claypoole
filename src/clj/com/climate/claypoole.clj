@@ -29,10 +29,7 @@
      Callable
      ExecutorService
      Future
-     LinkedBlockingQueue
-     PriorityBlockingQueue
-     ThreadPoolExecutor
-     TimeUnit]))
+     LinkedBlockingQueue]))
 
 
 (def ^:dynamic *parallel*
@@ -221,6 +218,7 @@
                 ^ExecutorService pool* pool
                 ^Callable f* (impl/binding-conveyor-fn f)
                 fut (.submit pool* f*)]
+            ;; Make an object just like Clojure futures.
             (reify
               clojure.lang.IDeref
               (deref [_] (impl/deref-future fut))
@@ -278,10 +276,10 @@
     (doall (apply map f arg-seqs))
     (let [[shutdown? pool] (impl/->threadpool pool)
           args (apply map vector (map impl/unchunk arg-seqs))
-          futures (map (fn [a] (future-call pool
-                                            (with-meta #(apply f a)
-                                                       {:args a})))
-                       args)
+          futures (for [a args]
+                    (future-call pool
+                                 (with-meta #(apply f a)
+                                            {:args a})))
           ;; Start eagerly parallel processing.
           read-future (core/future
                         (try
@@ -290,7 +288,7 @@
       ;; Read results as available.
       (concat (map deref futures)
               ;; Deref the reading future to get its exceptions, if it had any.
-              @read-future))))
+              (lazy-seq (deref read-future))))))
 
 (defn upmap
   "Like pmap, except the return value is a sequence of results ordered by
@@ -309,6 +307,9 @@
                         (try
                           (doseq [a args
                                   :let [p (promise)]]
+                            ;; We can't directly make a future add itself to a
+                            ;; queue. Instead, we use a promise for
+                            ;; indirection.
                             (deliver p (future-call pool
                                                     (with-meta
                                                       #(try
@@ -319,7 +320,7 @@
       ;; Read results as available.
       (concat (for [_ args] (-> q .take deref))
               ;; Deref the reading future to get its exceptions, if it had any.
-              @read-future))))
+              (lazy-seq (deref read-future))))))
 
 (defn pcalls
   "Like clojure.core.pcalls, except it takes a threadpool. For more detail on
@@ -378,30 +379,17 @@
   this will not have useful parallelism:
       (pfor pool [i (range 1000) :let [result (complex-computation i)]] result)
 
-  You can use the special binding :priority to set the priorities of the tasks.
+  You can use the special binding :priority (which must be the last binding) to
+  set the priorities of the tasks.
+      (upfor (priority-threadpool 10) [i (range 1000)
+                                       :priority (inc i)]
+        (complex-computation i))
   "
   [pool bindings & body]
   (pfor-internal pool bindings body `pmap))
 
 (defmacro upfor
-  "An unordered, parallel version of for. It is like for, except it takes a
-  threadpool, is parallel, and returns its results ordered by completion time.
-  For more detail on its parallelism and on its threadpool argument, see
-  upmap.
-
-  Note that while the body is executed in parallel, the bindings are executed
-  in serial, so while this will call complex-computation in parallel:
-      (upfor pool [i (range 1000)]
-        (complex-computation i))
-  this will not have useful parallelism:
-      (upfor pool [i (range 1000)
-                   :let [result (complex-computation i)]]
-        result)
-
-  You can use the special binding :priority to set the priorities of the tasks.
-      (upfor (priority-threadpool 10) [i (range 1000)
-                                       :priority (inc i)]
-        (complex-computation i))
-  "
+  "Like pfor, except the return value is a sequence of results ordered by
+  *completion time*, not by input order."
   [pool bindings & body]
   (pfor-internal pool bindings body `upmap))

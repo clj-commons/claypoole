@@ -23,7 +23,6 @@
      PriorityThreadpoolImpl]
     [java.util
      Collection
-     Comparator
      List]
     [java.util.concurrent
      ExecutionException
