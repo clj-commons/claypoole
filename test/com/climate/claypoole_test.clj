@@ -197,7 +197,6 @@
         (Thread/sleep 50)
         (is (= @started (set results) (set input)))))))
 
-
 (defn check-fn-exception
   "Check that a pmap function correctly passes exceptions caused by the
   function."
