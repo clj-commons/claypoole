@@ -275,6 +275,7 @@
   (if (serial? pool)
     (doall (apply map f arg-seqs))
     (let [[shutdown? pool] (impl/->threadpool pool)
+          ;; Use map to handle the argument sequences.
           args (apply map vector (map impl/unchunk arg-seqs))
           futures (for [a args]
                     (future-call pool
@@ -300,6 +301,7 @@
   (if (serial? pool)
     (doall (apply map f arg-seqs))
     (let [[shutdown? pool] (impl/->threadpool pool)
+          ;; Use map to handle the argument sequences.
           args (apply map vector (map impl/unchunk arg-seqs))
           q (LinkedBlockingQueue.)
           ;; Start eagerly parallel processing.
@@ -362,6 +364,8 @@
     (let [bindings* (vec (drop-last 2 bindings))
           priority-value (last bindings)]
       `(let [pool# (with-priority-fn ~pool second)
+             ;; We can't just make functions; we have to have the priority as
+             ;; an argument to work with the priority-fn.
              [fns# priorities#] (apply map vector
                                        (for ~bindings*
                                          [(fn [priority#] ~@body)

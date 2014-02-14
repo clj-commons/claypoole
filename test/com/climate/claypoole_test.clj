@@ -17,6 +17,9 @@
     [com.climate.claypoole :as cp]
     [com.climate.claypoole.impl :as impl])
   (:import
+    [com.climate.claypoole.impl
+     ;; Import to make Eastwood happy.
+     PriorityThreadpool]
     [java.util.concurrent
      ExecutionException
      ExecutorService]))
@@ -132,7 +135,7 @@
       (is (thrown-with-msg?
             Exception #"Priority function exception"
             ;; Arity exception.
-            (doall
+            (dorun
               (cp/pmap (cp/with-priority-fn pool (fn [] 0))
                        (fn [x y] (+ x y))
                        (range 10) (range 10)))))
@@ -405,7 +408,7 @@
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
           Exception #"keyword found"
-          (doall (pmap-like pool
+          (dorun (pmap-like pool
                             (fn [i]
                               (if (keyword? i)
                                 (throw (Exception. "keyword found"))
@@ -426,7 +429,7 @@
                     (range 200))]
     (is (thrown-with-msg?
           Exception #"deliberate"
-          (doall (pmap-like pool inc inputs))))
+          (dorun (pmap-like pool inc inputs))))
     (.shutdown pool)))
 
 (defn check-maximum-parallelism-one-case
@@ -518,10 +521,11 @@
 (deftest test-future
   (testing "basic future test"
     (cp/with-shutdown! [pool 3]
-      (let [f (cp/future
+      (let [a (atom false)
+            f (cp/future
                 pool
                 ;; Body can contain multiple elements.
-                1
+                (reset! a true)
                 (range 10))]
         (is (= @f (range 10))))))
   (testing "future threadpool args"

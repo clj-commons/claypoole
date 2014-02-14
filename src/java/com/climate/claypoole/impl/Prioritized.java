@@ -13,7 +13,7 @@
 
 package com.climate.claypoole.impl;
 
-/** Any object with a priority. */
+/** An object with a priority. */
 public interface Prioritized {
   public long getPriority();
 }

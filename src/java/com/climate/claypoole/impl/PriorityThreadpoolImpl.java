@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 /** A fixed-size threadpool that does tasks in priority order.
  *
- * Submitted tasks can have their own priority by implementing Prioritized;
+ * Submitted tasks have their own priority if they implement Prioritized;
  * otherwise, they are assigned the pool's default priority.
  */
 public class PriorityThreadpoolImpl extends ThreadPoolExecutor {

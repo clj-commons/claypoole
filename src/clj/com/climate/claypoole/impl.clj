@@ -63,9 +63,7 @@
       clojure.lang.IDeref
       (deref [_] result)
       clojure.lang.IBlockingDeref
-      (deref
-        [_ timeout-ms timeout-val]
-        result)
+      (deref [_ timeout-ms timeout-val] result)
       clojure.lang.IPending
       (isRealized [_] true)
       Future
@@ -119,11 +117,10 @@
           thread-id (atom -1)]
       (reify ThreadFactory
         (^Thread newThread [_ ^Runnable r]
-          (let [t (.newThread default-factory r)]
-            (doto t
-              (.setDaemon daemon*)
-              (.setName (str pool-name* "-" (swap! thread-id inc)))
-              (.setPriority thread-priority*))))))))
+          (doto (.newThread default-factory r)
+            (.setDaemon daemon*)
+            (.setName (str pool-name* "-" (swap! thread-id inc)))
+            (.setPriority thread-priority*)))))))
 
 (defn unchunk
   "Takes a seqable and returns a lazy sequence that is maximally lazy.
@@ -137,18 +134,21 @@
 (defn threadpool
   "Make a threadpool. It should be shutdown when no longer needed.
 
-  See docs in com.climate.claypoole/threadpool.
-  "
+  See docs in com.climate.claypoole/threadpool."
   [n & args]
-  (let [factory (apply thread-factory args)]
-    (Executors/newFixedThreadPool n factory)))
+  (Executors/newFixedThreadPool n (apply thread-factory args)))
 
 (defn- prioritize
   "Apply a priority function to a task.
 
   Note that this re-throws all priority-fn exceptions as ExecutionExceptions.
   That shouldn't mess anything up because the caller re-throws it as an
-  ExecutionException anyway."
+  ExecutionException anyway.
+
+  For simplicity, prioritize reifies both Callable and Runnable, rather than
+  having one prioritize function for each of those types. That means, for
+  example, that if you prioritize a Runnable that is not also a Callable, you
+  might want to cast the result to Runnable or otherwise use it carefully."
   [task, ^IFn priority-fn]
   (let [priority (try
                    (long (priority-fn (-> task meta :args)))
@@ -163,19 +163,20 @@
       Prioritized
       (getPriority [_] priority))))
 
-;; A Threadpool that has a priority function.
+;; A Threadpool that applies a priority function to tasks and uses a
+;; PriorityThreadpoolImpl to run them.
 (deftype PriorityThreadpool [^PriorityThreadpoolImpl pool, ^IFn priority-fn]
   ExecutorService
   (^boolean awaitTermination [_, ^long timeout, ^TimeUnit unit]
     (.awaitTermination pool timeout unit))
   (^List invokeAll [_, ^Collection tasks]
-    (.invokeAll pool tasks))
+    (.invokeAll pool (map #(prioritize % priority-fn) tasks)))
   (^List invokeAll [_, ^Collection tasks, ^long timeout, ^TimeUnit unit]
-    (.invokeAll pool tasks timeout unit))
+    (.invokeAll pool (map #(prioritize % priority-fn) tasks) timeout unit))
   (^Object invokeAny [_, ^Collection tasks]
-    (.invokeAny pool tasks))
+    (.invokeAny pool (map #(prioritize % priority-fn) tasks)))
   (^Object invokeAny [_, ^Collection tasks, ^long timeout, ^TimeUnit unit]
-    (.invokeAny pool tasks timeout unit))
+    (.invokeAny pool (map #(prioritize % priority-fn) tasks) timeout unit))
   (^boolean isShutdown [_]
     (.isShutdown pool))
   (^boolean isTerminated [_]
