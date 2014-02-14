@@ -1,5 +1,10 @@
 CHANGES
 
+0.2.0
+
+- Added priority threadpools
+- Made with-shutdown! option take multiple threadpools
+
 0.1.1
 
 - Fixed major bug where pmap etc. blocked on reading the entire input stream
