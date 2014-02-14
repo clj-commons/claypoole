@@ -12,7 +12,11 @@
 ;; and limitations under the License.
 
 (ns com.climate.claypoole
-  "Threadpool tools for Clojure."
+  "Threadpool tools for Clojure.
+
+  A threadpool is just an ExecutorService with a fixed number of threads. In
+  general, you can use your own ExecutorService in place of any threadpool, and
+  you can treat a threadpool as you would any other ExecutorService."
   (:refer-clojure :exclude [future future-call pcalls pmap pvalues])
   (:require
     [clojure.core :as core]
@@ -47,6 +51,10 @@
 (defn threadpool
   "Make a threadpool. It should be shutdown when no longer needed.
 
+  A threadpool is just an ExecutorService with a fixed number of threads. In
+  general, you can use your own ExecutorService in place of any threadpool, and
+  you can treat a threadpool as you would any other ExecutorService.
+
   This takes optional keyword arguments:
     :daemon, a boolean indicating whether the threads are daemon threads,
              which will automatically die when the JVM exits, defaults to
@@ -69,10 +77,11 @@
   "Make a threadpool that chooses tasks based on their priorities.
 
   Assign priorities to tasks by wrapping the pool with with-priority or
-  with-priority-fn.
+  with-priority-fn. You can also set a default priority with keyword argument
+  :default-priority.
 
-  You can also set a default priority with keyword argument :default-priority.
-  Otherwise, this uses the same keyword arguments as threadpool."
+  Otherwise, this uses the same keyword arguments as threadpool, and functions
+  just like any other ExecutorService."
   ^PriorityThreadpool
   [n & {:keys [default-priority] :as args
         :or {default-priority 0}}]
@@ -105,7 +114,14 @@
     (def t2 (future (with-priority p 2) 2))
     (def t3 (future (with-priority p 3) 3))
 
-  will use pool p to run these tasks with priorities 1, 2, and 3 respectively."
+  will use pool p to run these tasks with priorities 1, 2, and 3 respectively.
+
+  If you nest priorities, the outermost one \"wins\", so this task will be run
+  at priority 3:
+
+    (def wp (with-priority p 1))
+    (def t1 (future (with-priority (with-priority wp 2) 3) :result))
+  "
   ^ExecutorService [^ExecutorService pool priority]
   (with-priority-fn pool (constantly priority)))
 

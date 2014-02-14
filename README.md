@@ -224,11 +224,11 @@ You can create a threadpool that respects task priorities by creating a
 ```
 
 Then, use functions `with-priority` and `with-priority-fn` to set the priority
-of your tasks:
+of your tasks, or just set the `:priority` in your `for` loop:
 
 ```clojure
 (cp/future (cp/with-priority p1 100) (myfn))
-;; Nothing bad happens if you nest with-priority. The innermost one "wins";
+;; Nothing bad happens if you nest with-priority. The outermost one "wins";
 ;; this task runs at priority 2.
 (cp/future (cp/with-priority (cp-with-priority p1 1) 2) (myfn))
 ;; For pmaps, you can use a priority function, which is called with your list of
@@ -240,6 +240,14 @@ of your tasks:
               :priority (- i)]
   (myfn i))
 ```
+
+## What about Java interoperability?
+
+Under the hood, threadpools are just instances of
+`java.util.concurrent.ExecutorService`. You can use any `ExecutorService` in
+place of a threadpool, and you can use a threadpool just as you would an
+`ExecutorService`. This means you can create custom threadpools and use them
+easily.
 
 ## Why the name "Claypoole"?
 
