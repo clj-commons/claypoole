@@ -18,23 +18,23 @@ parallelism). Instead, people tend to fall back on Java. For instance, on
 the recommendation is to create an `ExecutorService` and call its `invokeAll`
 method.
 
-Clojure's `pmap` function is another example of a simple parallelism tool that
-was insufficiently flexible for our needs.
-
-* `pmap` uses a hardcoded number of threads (ncpus + 2). `pmap` is designed for
-  CPU-bound tasks, so it may not give adequate parallelism for latency-bound
-  tasks like network requests.
-* `pmap` is lazy. It will only work a little ahead of where its output is
-  being read. However, usually we want parallelism so we can get things done as
-  fast as possible, in which case we want to do work eagerly.
-* `pmap` is always ordered. Sometimes, to reduce latency, we just want to get
-  the results of tasks in the order they complete.
-
 On the other hand, we do not need the flexible building blocks that are
 [`core.async`](https://github.com/clojure/core.async);
 we just want to run some simple tasks in parallel.  Similarly,
 [`reducers`](http://clojure.org/reducers) is elegant, but we can't control its
 level of parallelism.
+
+Essentially, we wanted a `pmap` function that improves on the original in
+several ways:
+
+* We should be able to set the size of the threadpool `pmap` uses, so it would
+  be tunable for non-CPU-bound tasks like network requests.
+* We should be able to share a threadpool between multiple `pmap`s to control
+  the amount of simultaneous work we're doing.
+* We would like it to be streaming rather than lazy, so we can start it going
+  and expect it to work in the background without using `doall`.
+* We would like to be able to do an unordered `pmap`, so that we can start
+  handling the first response as fast as possible.
 
 ## How do I use claypoole?
 
