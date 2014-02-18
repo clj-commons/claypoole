@@ -398,6 +398,27 @@
         (Thread/sleep 50)
         (is (= @started (set results) (set input)))))))
 
+(defn check-chaining
+  "Check that we can chain pmaps."
+  [pmap-like]
+  (cp/with-shutdown! [p1 (cp/threadpool 2)
+                      p2 (cp/threadpool 4)]
+    (is (= (range 1 11)
+           (->> (range 10)
+                (pmap-like p1 inc)
+                sort)))
+    (is (= (range 2 12)
+           (->> (range 10)
+                (pmap-like p1 inc)
+                (pmap-like p1 inc)
+                sort)))
+    (is (= (range 3 13)
+           (->> (range 10)
+                (pmap-like p1 inc)
+                (pmap-like p1 inc)
+                (pmap-like p2 inc)
+                sort)))))
+
 (defn check-shutdown-exceptions
   "Check that exceptions are thrown when tasks go to a shutdown pool."
   [pmap-like]
@@ -531,7 +552,9 @@
     (check-*parallel*-disables pmap-like))
   (testing (format "%s throws exceptions when tasks are sent to a shutdown pool"
                    fn-name)
-    (check-shutdown-exceptions pmap-like)))
+    (check-shutdown-exceptions pmap-like))
+  (testing (format "%s can be chained in various threadpools" fn-name)
+    (check-chaining pmap-like)))
 
 
 (deftest test-future
@@ -570,7 +593,9 @@
     (testing "Binding cp/*parallel* can disable parallelism in future"
       (check-*parallel*-disables pmap-like))
     (testing "Future throws exceptions when tasks are sent to a shutdown pool"
-      (check-shutdown-exceptions pmap-like))))
+      (check-shutdown-exceptions pmap-like))
+    (testing "Futures can be chained in various threadpools."
+      (check-chaining pmap-like))))
 
 (deftest test-pmap
   (testing "basic pmap test"
