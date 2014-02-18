@@ -398,6 +398,19 @@
         (Thread/sleep 50)
         (is (= @started (set results) (set input)))))))
 
+(defn check-shutdown-exceptions
+  "Check that exceptions are thrown when tasks go to a shutdown pool."
+  [pmap-like]
+  (cp/with-shutdown! [pool 2]
+    (let [input (range 4)
+          start (promise)
+          delayed-input (map (fn [i] (deref start) i) input)
+          results (future (pmap-like pool identity
+                                     (concat input delayed-input)))]
+      (Thread/sleep 50)
+      (cp/shutdown pool)
+      (deliver start true)
+      (is (thrown? Exception (doall @results))))))
 
 (defn check-fn-exception
   "Check that a pmap function correctly passes exceptions caused by the
@@ -515,7 +528,10 @@
     (check-->threadpool pmap-like))
   (testing (format "%s is made serial by binding cp/*parallel* to false"
                    fn-name)
-    (check-*parallel*-disables pmap-like)))
+    (check-*parallel*-disables pmap-like))
+  (testing (format "%s throws exceptions when tasks are sent to a shutdown pool"
+                   fn-name)
+    (check-shutdown-exceptions pmap-like)))
 
 
 (deftest test-future
@@ -552,7 +568,9 @@
           pmap-like n pool)
         (when shutdown? (.shutdown pool))))
     (testing "Binding cp/*parallel* can disable parallelism in future"
-      (check-*parallel*-disables pmap-like))))
+      (check-*parallel*-disables pmap-like))
+    (testing "Future throws exceptions when tasks are sent to a shutdown pool"
+      (check-shutdown-exceptions pmap-like))))
 
 (deftest test-pmap
   (testing "basic pmap test"

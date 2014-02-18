@@ -306,18 +306,36 @@
           q (LinkedBlockingQueue.)
           ;; Start eagerly parallel processing.
           read-future (core/future
+                        ;; Try to run schedule all the tasks, but definitely
+                        ;; shutdown the pool if necessary.
                         (try
                           (doseq [a args
                                   :let [p (promise)]]
-                            ;; We can't directly make a future add itself to a
-                            ;; queue. Instead, we use a promise for
-                            ;; indirection.
-                            (deliver p (future-call pool
-                                                    (with-meta
-                                                      #(try
-                                                         (apply f a)
-                                                         (finally (.add q @p)))
-                                                      {:args a}))))
+                            ;; Try to schedule one task, but definitely add
+                            ;; something to the queue for the task.
+                            (try
+                              ;; We can't directly make a future add itself to
+                              ;; a queue. Instead, we use a promise for
+                              ;; indirection.
+                              (deliver p (future-call
+                                           pool
+                                           (with-meta
+                                             ;; Try to run the task, but
+                                             ;; definitely add the future to
+                                             ;; the queue.
+                                             #(try
+                                                (apply f a)
+                                                ;; Even if we had an exception
+                                                ;; running the task, make sure
+                                                ;; the future shows up in the
+                                                ;; queue.
+                                                (finally (.add q @p)))
+                                             {:args a})))
+                              ;; If we had an exception scheduling a task,
+                              ;; let's plan to re-throw that at queue read
+                              ;; time.
+                              (catch Exception e
+                                (.add q (delay (throw e))))))
                           (finally (when shutdown? (shutdown pool)))))]
       ;; Read results as available.
       (concat (for [_ args] (-> q .take deref))
