@@ -1,5 +1,9 @@
 CHANGES
 
+0.1.2
+
+- Dummy change
+
 0.1.1
 
 - Fixed major bug where pmap etc. blocked on reading the entire input stream
