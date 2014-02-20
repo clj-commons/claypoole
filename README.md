@@ -32,7 +32,8 @@ several ways:
 * We should be able to share a threadpool between multiple `pmap`s to control
   the amount of simultaneous work we're doing.
 * We would like it to be streaming rather than lazy, so we can start it going
-  and expect it to work in the background without using `doall`.
+  and expect it to work in the background without explicitly consuming the
+  results.
 * We would like to be able to do an unordered `pmap`, so that we can start
   handling the first response as fast as possible.
 

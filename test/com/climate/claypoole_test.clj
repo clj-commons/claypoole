@@ -242,7 +242,6 @@
     (let [pool (cp/threadpool 4)
           start (promise)
           result (promise)
-          myf #(deliver result (deref start))
           f (.submit pool (callable #(deliver result (deref start))))]
       (is (false? (cp/shutdown? pool)))
       (Thread/sleep 50)
@@ -572,7 +571,8 @@
                 ;; Body can contain multiple elements.
                 (reset! a true)
                 (range 10))]
-        (is (= @f (range 10))))))
+        (is (= @f (range 10)))
+        (is (true? @a)))))
   (testing "future threadpool args"
     (is (thrown? IllegalArgumentException (cp/future 3 (inc 1))))
     (is (thrown? IllegalArgumentException (cp/future nil (inc 1))))
