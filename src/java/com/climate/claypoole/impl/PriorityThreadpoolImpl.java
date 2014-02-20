@@ -50,6 +50,8 @@ public class PriorityThreadpoolImpl extends ThreadPoolExecutor {
     this.defaultPriority = defaultPriority;
   }
 
+  /** Get the priority of an object, using our defaultPriority as a backup.
+   */
   protected long getPriority(Object o) {
     if (o instanceof Prioritized) {
       return ((Prioritized) o).getPriority();

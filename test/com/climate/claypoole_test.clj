@@ -73,10 +73,9 @@
             completed (atom [])
             tasks (doall
                     (for [i (range 10)]
-                      (do
-                        (cp/future (cp/with-priority pool i)
-                                   (deref start)
-                                   (swap! completed conj i)))))]
+                      (cp/future (cp/with-priority pool i)
+                                 (deref start)
+                                 (swap! completed conj i))))]
         ;; start tasks
         (Thread/sleep 50)
         (deliver start true)

@@ -35,13 +35,7 @@ public class PriorityFutureTask<V>
   @Override
   public int compareTo(Prioritized other) {
     // Sort for descending order.
-    if (this.priority > other.getPriority()) {
-      return -1;
-    } else if (this.priority == other.getPriority()) {
-      return 0;
-    } else {
-      return 1;
-    }
+    return Long.compare(other.getPriority(), this.priority);
   }
 
   @Override
