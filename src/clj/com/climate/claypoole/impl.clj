@@ -103,9 +103,9 @@
     (apply f (concat args (mapcat identity arg-map)))))
 
 (defn thread-factory
-  "Create a ThreadFactory with options including thread daemon status, the
-  thread name format (a string for format with one integer), and a thread
-  priority."
+  "Create a ThreadFactory with keyword options including thread daemon status
+  :daemon, the thread name format :name (a string for format with one integer),
+  and a thread priority :thread-priority."
   ^ThreadFactory [& {:keys [daemon thread-priority] pool-name :name}]
   (let [daemon* (boolean daemon)
         pool-name* (or pool-name (default-threadpool-name))

@@ -45,6 +45,16 @@
   []
   (.. Runtime getRuntime availableProcessors))
 
+(defn thread-factory
+  "Create a ThreadFactory with keyword options including thread daemon status
+  :daemon, the thread name format :name (a string for format with one integer),
+  and a thread priority :thread-priority.
+
+  This is exposed as a public function because it's handy if you're
+  instantiating your own ExecutorServices."
+  [& args]
+  (apply impl/thread-factory args))
+
 (defn threadpool
   "Make a threadpool. It should be shutdown when no longer needed.
 
