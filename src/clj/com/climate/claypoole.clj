@@ -29,7 +29,8 @@
      Callable
      ExecutorService
      Future
-     LinkedBlockingQueue]))
+     LinkedBlockingQueue
+     ScheduledExecutorService]))
 
 
 (def ^:dynamic *parallel*
@@ -71,7 +72,13 @@
              \"name-1\", etc. Defaults to \"claypoole-[pool-number]\".
     :thread-priority, an integer in [Thread/MIN_PRIORITY, Thread/MAX_PRIORITY]
              giving the priority of each thread, defaults to the priority of
-             the current thread"
+             the current thread
+
+  Note: Returns a ScheduledExecutorService rather than just an ExecutorService
+  because it's the same thing with a few bonus features."
+  ;; NOTE: The Clojure compiler doesn't seem to like the tests if we don't
+  ;; fully expand this typename.
+  ^java.util.concurrent.ScheduledExecutorService
   ;; NOTE: Although I'm repeating myself, I list all the threadpool-factory
   ;; arguments explicitly for API clarity.
   [n & {:keys [daemon thread-priority] pool-name :name}]

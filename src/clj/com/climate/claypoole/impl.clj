@@ -29,6 +29,7 @@
      Executors
      ExecutorService
      Future
+     ScheduledExecutorService
      ThreadFactory
      TimeoutException
      TimeUnit]))
@@ -135,8 +136,10 @@
   "Make a threadpool. It should be shutdown when no longer needed.
 
   See docs in com.climate.claypoole/threadpool."
-  [n & args]
-  (Executors/newFixedThreadPool n (apply thread-factory args)))
+  ^ScheduledExecutorService [n & args]
+  ;; Return a ScheduledThreadPool rather than a FixedThreadPool because it's
+  ;; the same thing with some bonus features.
+  (Executors/newScheduledThreadPool n (apply thread-factory args)))
 
 (defn- prioritize
   "Apply a priority function to a task.

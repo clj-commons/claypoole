@@ -25,6 +25,11 @@
      ExecutorService]))
 
 
+(defn callable
+  "Just a cast."
+  ^Callable [^clojure.lang.IFn f]
+  f)
+
 (defn check-threadpool-options
   [pool-constructor]
   (cp/with-shutdown! [pool (pool-constructor 4)]
@@ -237,7 +242,8 @@
     (let [pool (cp/threadpool 4)
           start (promise)
           result (promise)
-          f (.submit pool #(deliver result (deref start)))]
+          myf #(deliver result (deref start))
+          f (.submit pool (callable #(deliver result (deref start))))]
       (is (false? (cp/shutdown? pool)))
       (Thread/sleep 50)
       ;; Make sure the threadpool starts shutting down but doesn't complete
@@ -258,7 +264,7 @@
   (testing "Basic shutdown!"
     (let [pool (cp/threadpool 4)
           start (promise)
-          f (.submit pool #(deref start))]
+          f (.submit pool (callable #(deref start)))]
       (is (false? (cp/shutdown? pool)))
       (Thread/sleep 50)
       ;; Make sure the threadpool completes shutting down immediately.
