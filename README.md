@@ -4,7 +4,7 @@ The claypoole library provides threadpool-based parallel versions of Clojure
 functions such as `pmap`, `future`, and `for`.
 
 Claypoole is available in the Clojars repository. Just use this leiningen
-dependency: `[com.climate/claypoole "0.1.1"]`.
+dependency: `[com.climate/claypoole "0.2.0"]`.
 
 ## Why do you use claypoole?
 
@@ -18,23 +18,24 @@ parallelism). Instead, people tend to fall back on Java. For instance, on
 the recommendation is to create an `ExecutorService` and call its `invokeAll`
 method.
 
-Clojure's `pmap` function is another example of a simple parallelism tool that
-was insufficiently flexible for our needs.
-
-* `pmap` uses a hardcoded number of threads (ncpus + 2). `pmap` is designed for
-  CPU-bound tasks, so it may not give adequate parallelism for latency-bound
-  tasks like network requests.
-* `pmap` is lazy. It will only work a little ahead of where its output is
-  being read. However, usually we want parallelism so we can get things done as
-  fast as possible, in which case we want to do work eagerly.
-* `pmap` is always ordered. Sometimes, to reduce latency, we just want to get
-  the results of tasks in the order they complete.
-
 On the other hand, we do not need the flexible building blocks that are
 [`core.async`](https://github.com/clojure/core.async);
 we just want to run some simple tasks in parallel.  Similarly,
 [`reducers`](http://clojure.org/reducers) is elegant, but we can't control its
 level of parallelism.
+
+Essentially, we wanted a `pmap` function that improves on the original in
+several ways:
+
+* We should be able to set the size of the threadpool `pmap` uses, so it would
+  be tunable for non-CPU-bound tasks like network requests.
+* We should be able to share a threadpool between multiple `pmap`s to control
+  the amount of simultaneous work we're doing.
+* We would like it to be streaming rather than lazy, so we can start it going
+  and expect it to work in the background without explicitly consuming the
+  results.
+* We would like to be able to do an unordered `pmap`, so that we can start
+  handling the first response as fast as possible.
 
 ## How do I use claypoole?
 
@@ -79,17 +80,17 @@ possible.
 
 ```clojure
 (require '[com.climate.claypoole :as cp])
-(def net-pool (cp/threadpool 100))
-(def cpu-pool (cp/threadpool (cp/ncpus)))
-;; Unordered pmap doesn't return output in the same order as the input(!), but
-;; that means we can start using service2 as soon as possible.
-(def service1-responses (cp/upmap net-pool service1-request myinputs))
-(def service2-responses (cp/upmap net-pool service2-request service1-responses))
-(def results (cp/upmap cpu-pool handle-response service2-responses))
-;; ...eventually...
-;; The JVM doesn't automatically clean up threads for us.
-(cp/shutdown net-pool)
-(cp/shutdown cpu-pool)
+;; We'll use the with-shutdown! form to guarantee that pools are cleaned up.
+(cp/with-shutdown! [net-pool (cp/threadpool 100)
+                    cpu-pool (cp/threadpool (cp/ncpus))]
+  ;; Unordered pmap doesn't return output in the same order as the input(!),
+  ;; but that means we can start using service2 as soon as possible.
+  (def service1-resps (cp/upmap net-pool service1-request myinputs))
+  (def service2-resps (cp/upmap net-pool service2-request service1-resps))
+  (def results (cp/upmap cpu-pool handle-response service2-resps))
+  ;; ...eventually...
+  ;; Make sure sure the computation is complete before we shutdown the pools.
+  (doall results))
 ```
 
 Claypoole provides ordered and unordered parallel `for` macros. Note that only
@@ -105,6 +106,17 @@ binding will be done in the calling thread.
                                :let [ys (range x)]
                                y ys]
                   (myfn x y)))
+```
+
+Claypoole also lets you prioritize your backlog of tasks. Higher-priority tasks
+will be assigned to threads first. Here's an example; there is a more detailed
+description below.
+
+```clojure
+(def pool (cp/priority-threadpool 10))
+(def task1 (cp/future (cp/with-priority pool 1000) (myfn 1)))
+(def task2 (cp/future (cp/with-priority pool 0) (myfn 2)))
+(def moretasks (cp/pmap (cp/with-priority pool 10) myfn (range 3 10)))
 ```
 
 ## Do I really need to manage all those threadpools?
@@ -169,7 +181,10 @@ exits. You can create a daemon threadpool via:
 
 To construct a threadpool, use the `threadpool` function. It takes optional
 keyword arguments allowing you to change the thread names, their daemon status,
-and their priority.
+and their priority. (NOTE: Thread priority is [a system-level property that
+depends on the
+OS](http://oreilly.com/catalog/expjava/excerpt/#EXJ-CH-6-SECT-4); it is not the
+same as the task priority, described below.)
 
 ```clojure
 (def pool (cp/threadpool (cp/ncpus)
@@ -199,10 +214,46 @@ like so:
     (cp/pmap pool myfn inputs)))
 ```
 
+## How can I prioritize my tasks?
+
+You can create a threadpool that respects task priorities by creating a
+`priority-threadpool`:
+
+```clojure
+(def p1 (cp/priority-threadpool 5))
+(def p2 (cp/priority-threadpool 5 :default-priority -10))
+```
+
+Then, use functions `with-priority` and `with-priority-fn` to set the priority
+of your tasks, or just set the `:priority` in your `for` loop:
+
+```clojure
+(cp/future (cp/with-priority p1 100) (myfn))
+;; Nothing bad happens if you nest with-priority. The outermost one "wins";
+;; this task runs at priority 2.
+(cp/future (cp/with-priority (cp-with-priority p1 1) 2) (myfn))
+;; For pmaps, you can use a priority function, which is called with your
+;; arguments. This will run 3 tasks at priorities 6, 5, and 4, respectively.
+(cp/upmap (cp/with-priority-fn p1 (fn [x _] x)) + [6 5 4] [1 2 3])
+;; For for loops, you can use the special :priority binding, which must be the
+;; last for binding.
+(cp/upfor p1 [i (range 10)
+              :priority (- i)]
+  (myfn i))
+```
+
+## What about Java interoperability?
+
+Under the hood, threadpools are just instances of
+`java.util.concurrent.ExecutorService`. You can use any `ExecutorService` in
+place of a threadpool, and you can use a threadpool just as you would an
+`ExecutorService`. This means you can create custom threadpools and use them
+easily.
+
 ## Why the name "Claypoole"?
 
-The claypoole library is named after [John
-Claypoole](http://en.wikipedia.org/wiki/Betsy_Ross) for reasons that are at
+The claypoole library is named after [John Claypoole (Betsy Ross's third
+husband)](http://en.wikipedia.org/wiki/Betsy_Ross) for reasons that are at
 best obscure.
 
 ## License

@@ -12,17 +12,25 @@
 ;; and limitations under the License.
 
 (ns com.climate.claypoole
-  "Threadpool tools for Clojure."
+  "Threadpool tools for Clojure.
+
+  A threadpool is just an ExecutorService with a fixed number of threads. In
+  general, you can use your own ExecutorService in place of any threadpool, and
+  you can treat a threadpool as you would any other ExecutorService."
   (:refer-clojure :exclude [future future-call pcalls pmap pvalues])
   (:require
     [clojure.core :as core]
     [com.climate.claypoole.impl :as impl])
   (:import
+    [com.climate.claypoole.impl
+     PriorityThreadpool
+     PriorityThreadpoolImpl]
     [java.util.concurrent
      Callable
      ExecutorService
      Future
-     LinkedBlockingQueue]))
+     LinkedBlockingQueue
+     ScheduledExecutorService]))
 
 
 (def ^:dynamic *parallel*
@@ -38,8 +46,22 @@
   []
   (.. Runtime getRuntime availableProcessors))
 
+(defn thread-factory
+  "Create a ThreadFactory with keyword options including thread daemon status
+  :daemon, the thread name format :name (a string for format with one integer),
+  and a thread priority :thread-priority.
+
+  This is exposed as a public function because it's handy if you're
+  instantiating your own ExecutorServices."
+  [& args]
+  (apply impl/thread-factory args))
+
 (defn threadpool
   "Make a threadpool. It should be shutdown when no longer needed.
+
+  A threadpool is just an ExecutorService with a fixed number of threads. In
+  general, you can use your own ExecutorService in place of any threadpool, and
+  you can treat a threadpool as you would any other ExecutorService.
 
   This takes optional keyword arguments:
     :daemon, a boolean indicating whether the threads are daemon threads,
@@ -50,18 +72,82 @@
              \"name-1\", etc. Defaults to \"claypoole-[pool-number]\".
     :thread-priority, an integer in [Thread/MIN_PRIORITY, Thread/MAX_PRIORITY]
              giving the priority of each thread, defaults to the priority of
-             the current thread"
-  ([] (threadpool (+ 2 (ncpus))))
-  ([n & {:keys [daemon thread-priority] pool-name :name}]
-   (impl/threadpool n
-                    :daemon daemon
-                    :name pool-name
-                    :thread-priority thread-priority)))
+             the current thread
+
+  Note: Returns a ScheduledExecutorService rather than just an ExecutorService
+  because it's the same thing with a few bonus features."
+  ;; NOTE: The Clojure compiler doesn't seem to like the tests if we don't
+  ;; fully expand this typename.
+  ^java.util.concurrent.ScheduledExecutorService
+  ;; NOTE: Although I'm repeating myself, I list all the threadpool-factory
+  ;; arguments explicitly for API clarity.
+  [n & {:keys [daemon thread-priority] pool-name :name}]
+  (impl/threadpool n
+                   :daemon daemon
+                   :name pool-name
+                   :thread-priority thread-priority))
+
+(defn priority-threadpool
+  "Make a threadpool that chooses tasks based on their priorities.
+
+  Assign priorities to tasks by wrapping the pool with with-priority or
+  with-priority-fn. You can also set a default priority with keyword argument
+  :default-priority.
+
+  Otherwise, this uses the same keyword arguments as threadpool, and functions
+  just like any other ExecutorService."
+  ^PriorityThreadpool
+  [n & {:keys [default-priority] :as args
+        :or {default-priority 0}}]
+  (PriorityThreadpool.
+    (PriorityThreadpoolImpl. n
+                             ;; Use our thread factory options.
+                             (impl/apply-map impl/thread-factory args)
+                             default-priority)
+    (constantly default-priority)))
+
+(defn with-priority-fn
+  "Make a priority-threadpool wrapper that uses a given priority function.
+
+  The priority function is applied to a pmap'd function's arguments. e.g.
+
+    (upmap (with-priority-fn p (fn [x _] x)) + [6 5 4] [1 2 3])
+
+  will use pool p to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
+  with priorities [6 5 4]."
+  ^PriorityThreadpool [^PriorityThreadpool pool priority-fn]
+  (let [^PriorityThreadpoolImpl pool* (.pool pool)]
+    (PriorityThreadpool. pool* priority-fn)))
+
+(defn with-priority
+  "Make a priority-threadpool wrapper with a given fixed priority.
+
+  All tasks run with this pool wrapper will have the given priority. e.g.
+
+    (def t1 (future (with-priority p 1) 1))
+    (def t2 (future (with-priority p 2) 2))
+    (def t3 (future (with-priority p 3) 3))
+
+  will use pool p to run these tasks with priorities 1, 2, and 3 respectively.
+
+  If you nest priorities, the outermost one \"wins\", so this task will be run
+  at priority 3:
+
+    (def wp (with-priority p 1))
+    (def t1 (future (with-priority (with-priority wp 2) 3) :result))
+  "
+  ^ExecutorService [^ExecutorService pool priority]
+  (with-priority-fn pool (constantly priority)))
 
 (defn threadpool?
   "Returns true iff the argument is a threadpool."
   [pool]
   (instance? ExecutorService pool))
+
+(defn priority-threadpool?
+  "Returns true iff the argument is a priority-threadpool."
+  [pool]
+  (instance? PriorityThreadpool pool))
 
 (defn shutdown
   "Syntactic sugar to stop a pool cleanly. This will stop the pool from
@@ -96,8 +182,9 @@
 
       (with-shutdown! [pool (theadpool 6)]
         (doall (pmap pool identity (range 1000))))
-      (with-shutdown! [pool 6]
-        (doall (pmap pool identity (range 1000))))
+      (with-shutdown! [pool1 6
+                       pool2 :serial]
+        (doall (pmap pool1 identity (range 1000))))
 
   Bad example:
 
@@ -105,14 +192,20 @@
         ;; Some of these tasks may be killed!
         (pmap pool identity (range 1000)))
   "
-  [[pool-sym pool-init] & body]
-  `(let [pool-init# ~pool-init]
-     (let [[_# ~pool-sym] (impl/->threadpool pool-init#)]
-       (try
-         ~@body
-         (finally
-           (when (threadpool? ~pool-sym)
-             (shutdown! ~pool-sym)))))))
+  [pool-syms-and-inits & body]
+  (when-not (even? (count pool-syms-and-inits))
+    (throw (IllegalArgumentException.
+             "with-shutdown! requires an even number of binding forms")))
+  (if (empty? pool-syms-and-inits)
+    `(do ~@body)
+    (let [[pool-sym pool-init & more] pool-syms-and-inits]
+      `(let [pool-init# ~pool-init
+             [_# ~pool-sym] (impl/->threadpool pool-init#)]
+         (try
+           (with-shutdown! ~more ~@body)
+           (finally
+             (when (threadpool? ~pool-sym)
+               (shutdown! ~pool-sym))))))))
 
 (defn- serial?
   "Check if we should run this computation in serial."
@@ -142,6 +235,7 @@
                 ^ExecutorService pool* pool
                 ^Callable f* (impl/binding-conveyor-fn f)
                 fut (.submit pool* f*)]
+            ;; Make an object just like Clojure futures.
             (reify
               clojure.lang.IDeref
               (deref [_] (impl/deref-future fut))
@@ -192,11 +286,18 @@
        serial via (doall map). This may be helpful during profiling, for example.
   "
   [pool f & arg-seqs]
+  (when (empty? arg-seqs)
+    (throw (IllegalArgumentException.
+             "pmap requires at least one sequence to map over")))
   (if (serial? pool)
     (doall (apply map f arg-seqs))
     (let [[shutdown? pool] (impl/->threadpool pool)
+          ;; Use map to handle the argument sequences.
           args (apply map vector (map impl/unchunk arg-seqs))
-          futures (map (fn [a] (future pool (apply f a))) args)
+          futures (for [a args]
+                    (future-call pool
+                                 (with-meta #(apply f a)
+                                            {:args a})))
           ;; Start eagerly parallel processing.
           read-future (core/future
                         (try
@@ -211,19 +312,47 @@
   "Like pmap, except the return value is a sequence of results ordered by
   *completion time*, not by input order."
   [pool f & arg-seqs]
+  (when (empty? arg-seqs)
+    (throw (IllegalArgumentException.
+             "upmap requires at least one sequence to map over")))
   (if (serial? pool)
     (doall (apply map f arg-seqs))
     (let [[shutdown? pool] (impl/->threadpool pool)
+          ;; Use map to handle the argument sequences.
           args (apply map vector (map impl/unchunk arg-seqs))
           q (LinkedBlockingQueue.)
           ;; Start eagerly parallel processing.
           read-future (core/future
+                        ;; Try to run schedule all the tasks, but definitely
+                        ;; shutdown the pool if necessary.
                         (try
                           (doseq [a args
                                   :let [p (promise)]]
-                            (deliver p (future pool (try
-                                                      (apply f a)
-                                                      (finally (.add q @p))))))
+                            ;; Try to schedule one task, but definitely add
+                            ;; something to the queue for the task.
+                            (try
+                              ;; We can't directly make a future add itself to
+                              ;; a queue. Instead, we use a promise for
+                              ;; indirection.
+                              (deliver p (future-call
+                                           pool
+                                           (with-meta
+                                             ;; Try to run the task, but
+                                             ;; definitely add the future to
+                                             ;; the queue.
+                                             #(try
+                                                (apply f a)
+                                                ;; Even if we had an exception
+                                                ;; running the task, make sure
+                                                ;; the future shows up in the
+                                                ;; queue.
+                                                (finally (.add q @p)))
+                                             {:args a})))
+                              ;; If we had an exception scheduling a task,
+                              ;; let's plan to re-throw that at queue read
+                              ;; time.
+                              (catch Exception e
+                                (.add q (delay (throw e))))))
                           (finally (when shutdown? (shutdown pool)))))]
       ;; Read results as available.
       (concat (for [_ args] (-> q .take deref))
@@ -256,6 +385,28 @@
   [pool & exprs]
   `(upcalls ~pool ~@(for [e exprs] `(fn [] ~e))))
 
+(defn- pfor-internal
+  "Do the messy parsing of the :priority from the for bindings."
+  [pool bindings body pmap-fn-sym]
+  (when (vector? pool)
+    (throw (IllegalArgumentException.
+             (str "Got a vector instead of a pool--"
+                  "did you forget to use a threadpool?"))))
+  (if-not (= :priority (first (take-last 2 bindings)))
+    ;; If there's no priority, everything is simple.
+    `(~pmap-fn-sym ~pool #(%) (for ~bindings (fn [] ~@body)))
+    ;; If there's a priority, God help us--let's pull that thing out.
+    (let [bindings* (vec (drop-last 2 bindings))
+          priority-value (last bindings)]
+      `(let [pool# (with-priority-fn ~pool (fn [_# p#] p#))
+             ;; We can't just make functions; we have to have the priority as
+             ;; an argument to work with the priority-fn.
+             [fns# priorities#] (apply map vector
+                                       (for ~bindings*
+                                         [(fn [priority#] ~@body)
+                                          ~priority-value]))]
+         (~pmap-fn-sym pool# #(%1 %2) fns# priorities#)))))
+
 (defmacro pfor
   "A parallel version of for. It is like for, except it takes a threadpool and
   is parallel. For more detail on its parallelism and on its threadpool
@@ -265,25 +416,19 @@
   in serial, so while this will call complex-computation in parallel:
       (pfor pool [i (range 1000)] (complex-computation i))
   this will not have useful parallelism:
-      (pfor pool [i (range 1000) :let [result (complex-computation i)] result)
+      (pfor pool [i (range 1000) :let [result (complex-computation i)]] result)
+
+  You can use the special binding :priority (which must be the last binding) to
+  set the priorities of the tasks.
+      (upfor (priority-threadpool 10) [i (range 1000)
+                                       :priority (inc i)]
+        (complex-computation i))
   "
   [pool bindings & body]
-  `(apply pcalls ~pool (for ~bindings (fn [] ~@body))))
+  (pfor-internal pool bindings body `pmap))
 
 (defmacro upfor
-  "An unordered, parallel version of for. It is like for, except it takes a
-  threadpool, is parallel, and returns its results ordered by completion time.
-  For more detail on its parallelism and on its threadpool argument, see
-  upmap.
-
-  Note that while the body is executed in parallel, the bindings are executed
-  in serial, so while this will call complex-computation in parallel:
-      (upfor pool [i (range 1000)]
-        (complex-computation i))
-  this will not have useful parallelism:
-      (upfor pool [i (range 1000)
-                   :let [result (complex-computation i)]]
-        result)
-  "
+  "Like pfor, except the return value is a sequence of results ordered by
+  *completion time*, not by input order."
   [pool bindings & body]
-  `(apply upcalls ~pool (for ~bindings (fn [] ~@body))))
+  (pfor-internal pool bindings body `upmap))
