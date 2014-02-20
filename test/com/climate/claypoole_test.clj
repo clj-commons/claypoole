@@ -439,7 +439,7 @@
       (Thread/sleep 50)
       (cp/shutdown pool)
       (deliver start true)
-      (is (thrown? Exception (doall @results))))))
+      (is (thrown? Exception (dorun @results))))))
 
 (defn check-fn-exception
   "Check that a pmap function correctly passes exceptions caused by the
