@@ -125,12 +125,14 @@
   (testing "with-priority-fn works for simple upmap"
     (cp/with-shutdown! [pool (cp/priority-threadpool 1)]
       (let [start (promise)
-            results (cp/upmap (cp/with-priority-fn pool first)
+            results (cp/upmap (cp/with-priority-fn
+                                pool (fn [& args] (first args)))
                               (fn [i]
                                 (deref start)
                                 i)
                               (range 10))]
         ;; start tasks
+        (Thread/sleep 50)
         (deliver start true)
         (is (= [0 9 8 7 6 5 4 3 2 1]
                results)))))
@@ -146,7 +148,9 @@
       (is (thrown-with-msg?
             ;; No arguments passed to priority function.
             Exception #"Priority function exception"
-            (deref (cp/future (cp/with-priority-fn pool first) 1)))))))
+            (deref (cp/future (cp/with-priority-fn
+                                pool (fn [& args] (first args)))
+                              1)))))))
 
 (deftest test-for-priority
   (testing "pfor uses priority"

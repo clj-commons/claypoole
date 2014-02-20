@@ -111,7 +111,7 @@
 
   The priority function is applied to a pmap'd function's arguments. e.g.
 
-    (upmap (with-priority-fn p first) + [6 5 4] [1 2 3])
+    (upmap (with-priority-fn p (fn [x _] x)) + [6 5 4] [1 2 3])
 
   will use pool p to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
   with priorities [6 5 4]."
@@ -398,7 +398,7 @@
     ;; If there's a priority, God help us--let's pull that thing out.
     (let [bindings* (vec (drop-last 2 bindings))
           priority-value (last bindings)]
-      `(let [pool# (with-priority-fn ~pool second)
+      `(let [pool# (with-priority-fn ~pool (fn [_# p#] p#))
              ;; We can't just make functions; we have to have the priority as
              ;; an argument to work with the priority-fn.
              [fns# priorities#] (apply map vector

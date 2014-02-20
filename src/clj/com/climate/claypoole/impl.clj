@@ -154,7 +154,7 @@
   might want to cast the result to Runnable or otherwise use it carefully."
   [task, ^IFn priority-fn]
   (let [priority (try
-                   (long (priority-fn (-> task meta :args)))
+                   (long (apply priority-fn (-> task meta :args)))
                    (catch Exception e
                      (throw (ExecutionException.
                               "Priority function exception" e))))]

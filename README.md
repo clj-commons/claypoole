@@ -232,9 +232,9 @@ of your tasks, or just set the `:priority` in your `for` loop:
 ;; Nothing bad happens if you nest with-priority. The outermost one "wins";
 ;; this task runs at priority 2.
 (cp/future (cp/with-priority (cp-with-priority p1 1) 2) (myfn))
-;; For pmaps, you can use a priority function, which is called with your list of
+;; For pmaps, you can use a priority function, which is called with your
 ;; arguments. This will run 3 tasks at priorities 6, 5, and 4, respectively.
-(cp/upmap (cp/with-priority-fn p1 first) + [6 5 4] [1 2 3])
+(cp/upmap (cp/with-priority-fn p1 (fn [x _] x)) + [6 5 4] [1 2 3])
 ;; For for loops, you can use the special :priority binding, which must be the
 ;; last for binding.
 (cp/upfor p1 [i (range 10)
