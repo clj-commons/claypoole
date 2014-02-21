@@ -1,9 +1,14 @@
 CHANGES
 
+0.2.1
+
+- Made it work with java 1.6
+
 0.2.0
 
 - Added priority threadpools
 - Made with-shutdown! option take multiple threadpools
+- Fixed exception handling in upmap
 
 0.1.1
 
