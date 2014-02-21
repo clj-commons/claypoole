@@ -32,7 +32,7 @@ public class PriorityThreadpoolImpl extends ThreadPoolExecutor {
 
   public PriorityThreadpoolImpl(int poolSize, long defaultPriority) {
     super(poolSize, poolSize, 0, TimeUnit.MILLISECONDS,
-        new PriorityBlockingQueue(poolSize));
+        new PriorityBlockingQueue<Runnable>(poolSize));
     this.defaultPriority = defaultPriority;
   }
 
@@ -46,7 +46,7 @@ public class PriorityThreadpoolImpl extends ThreadPoolExecutor {
       long keepAliveTime, TimeUnit unit,
       ThreadFactory threadFactory, long defaultPriority) {
     super(corePoolSize, maximumPoolSize, keepAliveTime, unit,
-        new PriorityBlockingQueue(corePoolSize), threadFactory);
+        new PriorityBlockingQueue<Runnable>(corePoolSize), threadFactory);
     this.defaultPriority = defaultPriority;
   }
 
@@ -61,12 +61,12 @@ public class PriorityThreadpoolImpl extends ThreadPoolExecutor {
 
   @Override
   protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
-    return new PriorityFutureTask(runnable, value, getPriority(runnable));
+    return new PriorityFutureTask<T>(runnable, value, getPriority(runnable));
   }
 
   @Override
   protected <T> RunnableFuture<T> newTaskFor(Callable<T> callable) {
-    return new PriorityFutureTask(callable, getPriority(callable));
+    return new PriorityFutureTask<T>(callable, getPriority(callable));
   }
 
   public long getDefaultPriority() {
