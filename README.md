@@ -9,7 +9,7 @@ dependency: `[com.climate/claypoole "0.2.1"]`.
 ## Why do you use claypoole?
 
 Claypoole gives us tools to deal with common parallelism issues by letting us
-use and manage our own threadpools.
+use and manage our own threadpools (a.k.a. thread pools).
 
 Clojure has some nice tools for simple parallelism, but they're not a complete
 solution for doing complex things (such as controlling the level of
