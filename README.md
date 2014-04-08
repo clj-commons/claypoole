@@ -59,7 +59,8 @@ start work going and know it'll get done. But if you try to `pmap` over
 
 ```clojure
 (require '[com.climate.claypoole :as cp])
-(def pool (cp/threadpool))
+;; A threadpool with 2 threads.
+(def pool (cp/threadpool 2))
 ;; Future
 (def fut (cp/future pool (myfn myinput)))
 ;; Ordered pmap
