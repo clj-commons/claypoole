@@ -44,7 +44,7 @@ claypoole's version of one of these standard Clojure functions:
 
 * `future`
 * `pmap`
-* `pcall`
+* `pcalls`
 * `pvalues`
 * `for`
 
