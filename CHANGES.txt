@@ -1,5 +1,9 @@
 CHANGES
 
+0.2.2
+
+- Made pmap behave like map does when a function throws an exception
+
 0.2.1
 
 - Made it work with java 1.6
