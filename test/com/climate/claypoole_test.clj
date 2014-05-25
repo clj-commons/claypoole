@@ -77,7 +77,7 @@
                                  (deref start)
                                  (swap! completed conj i))))]
         ;; start tasks
-        (Thread/sleep 50)
+        (Thread/sleep 100)
         (deliver start true)
         ;; Wait for tasks to complete
         (doseq [f tasks] (deref f))
@@ -132,7 +132,7 @@
                                 i)
                               (range 10))]
         ;; start tasks
-        (Thread/sleep 50)
+        (Thread/sleep 100)
         (deliver start true)
         (is (= [0 9 8 7 6 5 4 3 2 1]
                results)))))
@@ -163,7 +163,7 @@
                     (deref start)
                     (swap! completed conj i)
                     i)]
-        (Thread/sleep 50)
+        (Thread/sleep 100)
         (deliver start true)
         (dorun tasks)
         ;; Just worry about the rest of the tasks; the first one may be out of
@@ -180,7 +180,7 @@
                     (deref start)
                     (swap! completed conj i)
                     i)]
-        (Thread/sleep 50)
+        (Thread/sleep 100)
         (deliver start true)
         (dorun tasks)
         ;; Just worry about the rest of the tasks; the first one may be out of
@@ -224,10 +224,10 @@
         (cp/future (cp/with-priority pool 7)
                    (run 7))
         ;; Make them go.
-        (Thread/sleep 50)
+        (Thread/sleep 100)
         (deliver start true)
         ;; Check the results
-        (Thread/sleep 50)
+        (Thread/sleep 100)
         (is (sorted*? (reverse @results)))))))
 
 (deftest test-threadpool?
@@ -247,15 +247,15 @@
           result (promise)
           f (.submit pool (callable #(deliver result (deref start))))]
       (is (false? (cp/shutdown? pool)))
-      (Thread/sleep 50)
+      (Thread/sleep 100)
       ;; Make sure the threadpool starts shutting down but doesn't complete
       ;; until the threads finish.
       (cp/shutdown pool)
       (is (true? (cp/shutdown? pool)))
       (is (false? (.isTerminated pool)))
-      (Thread/sleep 50)
+      (Thread/sleep 100)
       (deliver start true)
-      (Thread/sleep 50)
+      (Thread/sleep 100)
       (is (true? (.isTerminated pool)))
       (is (true? @result))))
   (testing "Shutdown does not affect builtin threadpool"
@@ -268,12 +268,12 @@
           start (promise)
           f (.submit pool (callable #(deref start)))]
       (is (false? (cp/shutdown? pool)))
-      (Thread/sleep 50)
+      (Thread/sleep 100)
       ;; Make sure the threadpool completes shutting down immediately.
       (cp/shutdown! pool)
       (is (true? (cp/shutdown? pool)))
       ;; It can take some time for the threadpool to kill the threads.
-      (Thread/sleep 50)
+      (Thread/sleep 100)
       (is (true? (.isTerminated pool)))
       (is (.isDone f))
       (is (thrown? ExecutionException (deref f)))))
@@ -291,14 +291,14 @@
           (deliver outside-pool pool)
           ;; Use a future to avoid blocking on the :serial case.
           (deliver fp (future (.submit pool #(deref start))))
-          (Thread/sleep 50))
+          (Thread/sleep 100))
         ;; Make sure outside of the with-shutdown block the pool is properly
         ;; killed.
         (when-not (keyword? arg) (is (true? (cp/shutdown? @outside-pool)))
-          (Thread/sleep 50)
+          (Thread/sleep 100)
           (is (true? (.isTerminated @outside-pool)))
           (deliver start true)
-          (Thread/sleep 50)
+          (Thread/sleep 100)
           (is (.isDone @@fp))
           (is (thrown? ExecutionException (deref @@fp)))))))
   (testing "With-shutdown! works with any number of threadpools"
@@ -366,8 +366,8 @@
                                    (deliver (promise-chain (inc i)) i))
                                  i)
                                input)]
-        ;; All tasks should have started after 50ms.
-        (Thread/sleep 50)
+        ;; All tasks should have started after 100ms.
+        (Thread/sleep 100)
         (is (= @started (set input)))
         ;; Start the first task.
         (deliver (first promise-chain) nil)
@@ -399,11 +399,11 @@
             results (pmap-like pool
                                (fn [i] (swap! started conj i) i)
                                input)]
-        ;; All of the first set of tasks should have started after 50ms.
-        (Thread/sleep 50)
+        ;; All of the first set of tasks should have started after 100ms.
+        (Thread/sleep 100)
         (is (= @started (set first-inputs)))
-        (deliver pause (- n 0.5))
-        (Thread/sleep 50)
+        (deliver pause :pause)
+        (Thread/sleep 100)
         (is (= @started (set results) (set input)))))))
 
 (defn check-chaining
@@ -436,7 +436,7 @@
           delayed-input (map (fn [i] (deref start) i) input)
           results (future (pmap-like pool identity
                                      (concat input delayed-input)))]
-      (Thread/sleep 50)
+      (Thread/sleep 100)
       (cp/shutdown pool)
       (deliver start true)
       (is (thrown? Exception (dorun @results))))))
@@ -536,7 +536,7 @@
           ;; Check the results
           (is (= (map inc inputs) (sort @results)))
           ;; Wait for the thread to be shutdown.
-          (Thread/sleep 50)
+          (Thread/sleep 100)
           (when should-be-shutdown?
             (is (true? (cp/shutdown? @apool))))
           (when should-we-shutdown?
