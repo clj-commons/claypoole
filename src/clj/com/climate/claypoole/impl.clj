@@ -128,9 +128,10 @@
 
   Based on http://stackoverflow.com/questions/3407876/how-do-i-avoid-clojures-chunking-behavior-for-lazy-seqs-that-i-want-to-short-ci"
   [s]
-  (when-let [s (seq s)]
-    (cons (first s)
-          (lazy-seq (unchunk (rest s))))))
+  (lazy-seq
+    (when-let [s (seq s)]
+      (cons (first s)
+            (unchunk (rest s))))))
 
 (defn threadpool
   "Make a threadpool. It should be shutdown when no longer needed.
