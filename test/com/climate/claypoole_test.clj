@@ -37,18 +37,18 @@
     (let [factory (.getThreadFactory pool)
           start (promise)
           thread (.newThread factory #(deref start))]
-      (is (false? (.isDaemon thread)))
+      (is (true? (.isDaemon thread)))
       (is (not (empty? (re-find #"claypoole-[0-9]*-4" (.getName thread)))))
       (is (= (.getPriority (Thread/currentThread)) (.getPriority thread)))))
   (cp/with-shutdown! [pool (pool-constructor 4
-                                             :daemon true
+                                             :daemon false
                                              :name "fiberpond"
                                              :thread-priority 4)]
     (dotimes [_ 8] (.submit pool #(inc 1)))
     (let [factory (.getThreadFactory pool)
           start (promise)
           thread (.newThread factory #(deref start))]
-      (is (true? (.isDaemon thread)))
+      (is (false? (.isDaemon thread)))
       (is (= "fiberpond-4" (.getName thread)))
       (is (= 4 (.getPriority thread))))))
 
