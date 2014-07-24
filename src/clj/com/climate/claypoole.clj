@@ -67,7 +67,7 @@
   This takes optional keyword arguments:
     :daemon, a boolean indicating whether the threads are daemon threads,
              which will automatically die when the JVM exits, defaults to
-             false)
+             true)
     :name, a string giving the pool name, which will be the prefix of each
              thread name, resulting in threads named \"name-0\",
              \"name-1\", etc. Defaults to \"claypoole-[pool-number]\".
@@ -82,7 +82,8 @@
   ^java.util.concurrent.ScheduledExecutorService
   ;; NOTE: Although I'm repeating myself, I list all the threadpool-factory
   ;; arguments explicitly for API clarity.
-  [n & {:keys [daemon thread-priority] pool-name :name}]
+  [n & {:keys [daemon thread-priority] pool-name :name
+        :or {daemon true}}]
   (impl/threadpool n
                    :daemon daemon
                    :name pool-name

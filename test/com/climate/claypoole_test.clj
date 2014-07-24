@@ -592,6 +592,21 @@
              (check-shuts-off pmap-like))))
 
 
+(deftest test-daemon
+  (let [daemon? (fn [& args] (.isDaemon (Thread/currentThread)))]
+    (testing "threadpools are daemon by default"
+      (cp/with-shutdown! [pool 3]
+        (is (every? boolean
+                    (cp/pmap pool daemon? (range 100))))))
+    (testing "threadpools are daemon by default"
+      (cp/with-shutdown! [pool (cp/threadpool 3)]
+        (is (every? boolean
+                    (cp/pmap pool daemon? (range 100))))))
+    (testing "we can make non-daemon threadpools"
+      (cp/with-shutdown! [pool (cp/threadpool 3 :daemon false)]
+        (is (not-any? boolean
+                      (cp/pmap pool daemon?  (range 100))))))))
+
 (deftest test-future
   (testing "basic future test"
     (cp/with-shutdown! [pool 3]

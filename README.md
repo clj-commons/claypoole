@@ -156,6 +156,11 @@ below.)
 
 ## How do I dispose of my threadpools?
 
+*As of Claypoole version 0.3, by default all threadpools are daemon
+threadpools, so they should shut down when your main thread exits. But it's
+still good practice to clean up these resources. Neither the OS nor the JVM
+will take care of them for you!*
+
 The JVM does not automatically garbage collect threads for you. Instead, when
 you're done with your threadpool, you should use `shutdown` to gently shut down
 the pool, or `shutdown!` to kill the threads forcibly.
@@ -172,10 +177,11 @@ Of course, we have provided a convenience macro `with-shutdown!` that will
 ```
 
 Alternately, daemon threads will be automatically killed when the JVM process
-exits. You can create a daemon threadpool via:
+exits. *By default all threadpools are daemon threadpools and will exit when
+the main thread exits!* You can create a non-daemon threadpool via:
 
 ```clojure
-(def pool (cp/threadpool 10 :daemon true))
+(def pool (cp/threadpool 10 :daemon false))
 ```
 
 ## How do I set threadpool options?
@@ -189,7 +195,7 @@ same as the task priority, described below.)
 
 ```clojure
 (def pool (cp/threadpool (cp/ncpus)
-                         :daemon true
+                         :daemon false
                          :thread-priority 3
                          :name "my-pool"))
 ```
@@ -250,6 +256,42 @@ Under the hood, threadpools are just instances of
 place of a threadpool, and you can use a threadpool just as you would an
 `ExecutorService`. This means you can create custom threadpools and use them
 easily.
+
+## OMG My program isn't exiting!
+
+There are a few cases where threadpools will stop your program from exiting
+that can surprise users. We have endeavored to minimize them, but they can
+still be problems.
+
+### My program doesn't exit until 60 seconds after main exits.
+
+Claypoole actually uses some `clojure.core/future`s.  Unfortunately, those
+threads are from the agent threadpool, and they are not daemon threads. Those
+threads will automatically die 60 seconds after they're used. So if your main
+thread doesn't call either `shutdown-agents` or `System/exit`, those threads
+will keep going for a while!
+
+You'll [experience the same
+thing](http://tech.puredanger.com/2010/06/08/clojure-agent-thread-pools/) if
+you start a `future` or `pmap`--those extra threads have to be explicitly shut
+down, or they'll naturally die after 60 seconds.
+
+The answer is basically to call `(shutdown-agents)` before your main thread
+exits.
+
+_In a future version of Claypoole, we may switch to using a separate daemon
+threadpool for those futures. However, that could have other complications._
+
+### My program doesn't exit ever!
+
+Claypoole now (as of version 0.3) defaults to daemon threadpools, but before
+that threadpools were not daemons. If you have any non-daemon threadpools
+running and your main process exits, those threadpools will never die, and your
+program will hang indefinitely!
+
+The answer is: either use daemon threadpools (which is now the default) or be
+very careful to shut down your threadpools when you're done with them. See the
+above section on disposing of threadpools.
 
 ## Why the name "Claypoole"?
 
