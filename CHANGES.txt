@@ -1,12 +1,16 @@
 CHANGES
 
+0.3
+
+- Changed threadpools to be daemon by default
+
 0.2.2
 
 - Made pmap behave like map does when a function throws an exception
 
 0.2.1
 
-- Made it work with java 1.6
+- Made code work with java 1.6
 
 0.2.0
 
