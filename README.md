@@ -280,7 +280,8 @@ The answer is basically to call `(shutdown-agents)` before your main thread
 exits.
 
 _In a future version of Claypoole, we may switch to using a separate daemon
-threadpool for those futures. However, that could have other complications._
+threadpool for those futures. However, that could have other complications, so
+we are deferring that decision._
 
 ### My program doesn't exit ever!
 
