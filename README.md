@@ -4,7 +4,7 @@ The claypoole library provides threadpool-based parallel versions of Clojure
 functions such as `pmap`, `future`, and `for`.
 
 Claypoole is available in the Clojars repository. Just use this leiningen
-dependency: `[com.climate/claypoole "0.3"]`.
+dependency: `[com.climate/claypoole "0.3.1"]`.
 
 ## Why do you use claypoole?
 
