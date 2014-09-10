@@ -308,10 +308,10 @@
                                            (let [result (apply f a)]
                                              (send-result @p)
                                              result)
-                                           ;; Even if we had an exception
+                                           ;; Even if we had an error
                                            ;; running the task, make sure the
                                            ;; future shows up in the queue.
-                                           (catch Exception e
+                                           (catch Throwable t
                                              ;; We've still got to send that
                                              ;; result, even if it was an
                                              ;; exception, and we have to do it
@@ -320,7 +320,8 @@
                                              ;; If we've had an exception, kill
                                              ;; future and ongoing processes.
                                              (@canceller i)
-                                             (throw e)))
+                                             ;; Re-throw that throwable!
+                                             (throw t)))
                                         ;; Add the args to the function's
                                         ;; metadata for prioritization.
                                         {:args a})))

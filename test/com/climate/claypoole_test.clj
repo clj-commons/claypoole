@@ -451,11 +451,28 @@
         pool (cp/threadpool n)
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
-          Exception #"keyword found"
+          ExecutionException #"keyword found"
           (dorun (pmap-like pool
                             (fn [i]
                               (if (keyword? i)
                                 (throw (Exception. "keyword found"))
+                                i))
+                            inputs))))
+    (.shutdown pool)))
+
+(defn check-fn-throwable
+  "Check that a pmap function correctly passes non-Exception throwables caused
+  by the function."
+  [pmap-like]
+  (let [n 10
+        pool (cp/threadpool n)
+        inputs [0 1 2 3 :4 5 6 7 8 9]]
+    (is (thrown-with-msg?
+          ExecutionException #"keyword found"
+          (dorun (pmap-like pool
+                            (fn [i]
+                              (if (keyword? i)
+                                (throw (AssertionError. "keyword found"))
                                 i))
                             inputs))))
     (.shutdown pool)))
@@ -573,6 +590,8 @@
     (check-parallel pmap-like ordered?))
   (testing (format "%s emits exceptions correctly" fn-name)
     (check-fn-exception pmap-like))
+  (testing (format "%s emits non-Exception Throwables correctly" fn-name)
+    (check-fn-throwable pmap-like))
   (testing (format "%s handles input exceptions correctly" fn-name)
     (check-input-exception pmap-like))
   (testing (format "%s runs n things at once" fn-name)
@@ -632,6 +651,8 @@
       (check-parallel pmap-like true))
     (testing "future throws exceptions okay"
       (check-fn-exception pmap-like))
+    (testing "future throws exceptions okay"
+      (check-fn-throwable pmap-like))
     (testing "future doesn't do too much parallelism"
       ;; We don't check the number or nil cases because future doesn't accept
       ;; those.
