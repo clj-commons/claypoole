@@ -22,5 +22,5 @@
   :source-paths ["src/clj"]
   :java-source-paths ["src/java"]
   :pedantic? :warn
-  :dependencies [[org.clojure/clojure "1.5.1"]]
-  :plugins [[jonase/eastwood "0.1.0"]])
+  :dependencies [[org.clojure/clojure "1.6.0"]]
+  :plugins [[jonase/eastwood "0.1.4"]])

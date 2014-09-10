@@ -576,7 +576,7 @@
           results (pmap-like pool f (concat (impl/unchunk (range 200)) blocker))]
       (Thread/sleep 300)
       ;; Surely we hit the exception.
-      (is (thrown? Exception (doall results)))
+      (is (thrown? Exception (dorun results)))
       ;; Surely we didn't start every task.
       (is (< 1 (count @started) 100))
       ;; Surely something, but not everything, is returned, and we do not
