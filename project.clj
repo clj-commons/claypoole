@@ -12,7 +12,7 @@
 ;; and limitations under the License.
 
 (defproject com.climate/claypoole
-  "0.3.1"
+  "0.3.1-SNAPSHOT"
   :description "Claypoole: Threadpool tools for Clojure."
   :url "http://github.com/TheClimateCorporation/claypoole/"
   :license {:name "Apache License Version 2.0"
