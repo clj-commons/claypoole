@@ -257,6 +257,10 @@ place of a threadpool, and you can use a threadpool just as you would an
 `ExecutorService`. This means you can create custom threadpools and use them
 easily.
 
+You might also like using [digiriste](https://github.com/ztellman/dirigiste)
+threadpools with Claypoole. Digiriste provides a fast, instrumented
+ExecutorService that scales in a controllable way.
+
 ## OMG My program isn't exiting!
 
 There are a few cases where threadpools will stop your program from exiting
