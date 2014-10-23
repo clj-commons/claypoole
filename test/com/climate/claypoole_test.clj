@@ -575,10 +575,11 @@
   not guarantee that as a contract."
   [pmap-fn]
   (let [a (atom nil)
-        p (promise)
+        started (promise)
+        finish (promise)
         task-runner (future
                       (dorun
-                        (pmap-fn 3 deref
+                        (pmap-fn 1 deref
                                  (list
                                    ;; Have one task make a note when GC'd
                                    (delay
@@ -586,18 +587,20 @@
                                        #(reset! a :finalized)))
                                    (delay 1)
                                    (delay 2)
-                                   (delay 3)
-                                   p))))]
+                                   (delay (deliver started :started))
+                                   finish))))]
     ;; Let the tasks run
-    (Thread/sleep 100)
+    @started
     ;; Trigger GC
     (System/gc)
     ;; Wait for GC to run
-    (Thread/sleep 100)
+    (doseq [i (range 100)
+            :while (not @a)]
+      (Thread/sleep 1))
     ;; Verify that the task was GC'd
     (is (= @a :finalized))
     ;; Complete the map
-    (deliver p :done)
+    (deliver finish :done)
     @task-runner))
 
 (defn check-shuts-off
