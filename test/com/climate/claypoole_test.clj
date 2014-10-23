@@ -19,8 +19,7 @@
   (:import
     [com.climate.claypoole.impl
      ;; Import to make Eastwood happy.
-     PriorityThreadpool
-     TestFinalize]
+     PriorityThreadpool]
     [java.util.concurrent
      ExecutionException
      ExecutorService]))
@@ -562,6 +561,11 @@
           (when should-we-shutdown?
             (cp/shutdown! @apool)))))))
 
+;; A simple object to call a function at finalize.
+(deftype Finalizer [f]
+  Object
+  (finalize [_] (f)))
+
 (defn check-holding-thread
   "Verify that this pmap function does not hold onto the head of the sequence,
   so if no one else uses the results, they're garbage collected."
@@ -574,9 +578,8 @@
                                  (list
                                    ;; Have one task make a note when GC'd
                                    (delay
-                                     (TestFinalize.
-                                       #(do
-                                          (reset! a :finalized))))
+                                     (Finalizer.
+                                       #(reset! a :finalized)))
                                    (delay 1)
                                    (delay 2)
                                    (delay 3)
