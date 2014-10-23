@@ -568,7 +568,11 @@
 
 (defn check-holding-thread
   "Verify that this pmap function does not hold onto the head of the sequence,
-  so if no one else uses the results, they're garbage collected."
+  so if no one else uses the results, they're garbage collected.
+
+  Note: This test assumes that calling (System/gc) will cause un-referenced
+  objects to be finalized. So far, that seems to be true, though the JVM does
+  not guarantee that as a contract."
   [pmap-fn]
   (let [a (atom nil)
         p (promise)
