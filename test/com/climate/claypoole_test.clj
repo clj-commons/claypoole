@@ -561,6 +561,48 @@
           (when should-we-shutdown?
             (cp/shutdown! @apool)))))))
 
+;; A simple object to call a function at finalize.
+(deftype Finalizer [f]
+  Object
+  (finalize [_] (f)))
+
+(defn check-holding-thread
+  "Verify that this pmap function does not hold onto the head of the sequence,
+  so if no one else uses the results, they're garbage collected.
+
+  Note: This test assumes that calling (System/gc) will cause un-referenced
+  objects to be finalized. So far, that seems to be true, though the JVM does
+  not guarantee that as a contract."
+  [pmap-fn]
+  (let [a (atom nil)
+        started (promise)
+        finish (promise)
+        task-runner (future
+                      (dorun
+                        (pmap-fn 1 deref
+                                 (list
+                                   ;; Have one task make a note when GC'd
+                                   (delay
+                                     (Finalizer.
+                                       #(reset! a :finalized)))
+                                   (delay 1)
+                                   (delay 2)
+                                   (delay (deliver started :started))
+                                   finish))))]
+    ;; Let the tasks run
+    @started
+    ;; Trigger GC
+    (System/gc)
+    ;; Wait for GC to run
+    (doseq [i (range 100)
+            :while (not @a)]
+      (Thread/sleep 1))
+    ;; Verify that the task was GC'd
+    (is (= @a :finalized))
+    ;; Complete the map
+    (deliver finish :done)
+    @task-runner))
+
 (defn check-shuts-off
   [pmap-like]
   (cp/with-shutdown! [pool 2]
@@ -605,6 +647,8 @@
                    fn-name)
     (check-shutdown-exceptions pmap-like))
   (when lazy?
+    (testing (format "%s doesn't hold the head of lazy sequences" fn-name)
+      (check-holding-thread pmap-like))
     (testing (format "%s can be chained in various threadpools" fn-name)
              (check-chaining pmap-like))
     (testing (format "%s stops processing when an exception occurs" fn-name)
