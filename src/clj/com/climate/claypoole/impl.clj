@@ -213,3 +213,24 @@
                    (format
                      (str "Claypoole functions require a threadpool, a "
                           "number, :builtin, or :serial, not %s.") arg)))))
+
+(defn map-indexed-with-rest
+  "Given f and xs, return a sequence of (f i x s) for every x in xs where
+  s is the results of the rest of the map.
+
+  i.e. (map-indexed-with-rest #(do (prn [%1 %2 %3]) %2) [:x :y :z])
+  would print
+    [0 :x (:y :z)]
+    [1 :y (:z)]
+    [2 :z ()]
+
+  This is handy for lazy sequences that might need to see later elements
+  in the sequence, e.g. for cancelling futures."
+  [f xs & [i]]
+  (lazy-seq
+    (when (not (empty? xs))
+      (let [i (or i 0)
+            x (first xs)
+            more (rest xs)
+            results (map-indexed-with-rest f more (inc i))]
+        (cons (f i x results) results)))))

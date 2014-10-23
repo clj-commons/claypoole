@@ -269,9 +269,9 @@
 
 (defn- make-canceller
   "Creates a function to cancel a bunch of futures."
-  [future-reader future-seq]
+  [future-reader]
   (let [first-already-cancelled (atom Long/MAX_VALUE)]
-    (fn [i]
+    (fn [i future-seq]
       (let [cancel-end @first-already-cancelled]
         ;; Don't re-kill futures we've already zapped to prevent an O(n^2)
         ;; explosion.
@@ -280,7 +280,7 @@
           ;; Kill the future reader.
           (future-cancel future-reader)
           ;; Stop the tasks above i before cancel-end.
-          (doseq [f (->> future-seq (take cancel-end) (drop (inc i)))]
+          (doseq [f (->> future-seq (take (- cancel-end i)))]
             (future-cancel f)))))))
 
 (defn- pmap-core
@@ -294,7 +294,7 @@
           ;; Pre-declare the canceller because it needs the tasks but the tasks
           ;; need it too.
           canceller (promise)
-          start-task (fn [i a]
+          start-task (fn [i a later-tasks]
                        ;; We can't directly make a future add itself to a
                        ;; queue.  Instead, we use a promise for indirection.
                        (let [p (promise)]
@@ -319,14 +319,14 @@
                                              (send-result @p)
                                              ;; If we've had an exception, kill
                                              ;; future and ongoing processes.
-                                             (@canceller i)
+                                             (@canceller i later-tasks)
                                              ;; Re-throw that throwable!
                                              (throw t)))
                                         ;; Add the args to the function's
                                         ;; metadata for prioritization.
                                         {:args a})))
                          @p))
-          futures (map-indexed start-task args)
+          futures (impl/map-indexed-with-rest start-task args)
           ;; Start all the tasks in a real future, so we don't block.
           read-future (core/future
                         (try
@@ -334,7 +334,7 @@
                           (dorun futures)
                           ;; If we created a temporary pool, shut it down.
                           (finally (when shutdown? (shutdown pool)))))]
-      (deliver canceller (make-canceller read-future futures))
+      (deliver canceller (make-canceller read-future))
       ;; Read results as available.
       (concat (map read-result futures)
               ;; Deref the read-future to get its exceptions, if it has any.
