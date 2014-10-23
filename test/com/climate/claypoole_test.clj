@@ -19,7 +19,8 @@
   (:import
     [com.climate.claypoole.impl
      ;; Import to make Eastwood happy.
-     PriorityThreadpool]
+     PriorityThreadpool
+     TestFinalize]
     [java.util.concurrent
      ExecutionException
      ExecutorService]))
@@ -604,6 +605,8 @@
   (testing (format "%s throws exceptions when tasks are sent to a shutdown pool"
                    fn-name)
     (check-shutdown-exceptions pmap-like))
+  #_(testing (format "%s doesn't hold the head of lazy sequences" fn-name)
+    (check-holding-thread pmap-like))
   (when lazy?
     (testing (format "%s can be chained in various threadpools" fn-name)
              (check-chaining pmap-like))
@@ -668,6 +671,46 @@
       (check-shutdown-exceptions pmap-like))
     (testing "Futures can be chained in various threadpools."
       (check-chaining pmap-like))))
+
+(defn check-holding-thread
+  "Verify that this pmap function does not hold onto the head of the sequence,
+  so if no one else uses the results, they're garbage collected."
+  [pmap-fn]
+  (let [a (atom nil)
+        p (promise)
+        task-runner (future
+                      (dorun
+                        (pmap-fn 3 deref
+                                 (list
+                                   ;; Have one task make a note when GC'd
+                                   (delay
+                                     (TestFinalize.
+                                       #(do
+                                          (prn "finalized")
+                                          (reset! a :finalized))))
+                                   (delay 1)
+                                   (delay 2)
+                                   (delay 3)
+                                   p))))]
+    ;; Let the tasks run
+    (Thread/sleep 100)
+    ;; Trigger GC
+    (System/gc)
+    ;; Wait for GC to run
+    (Thread/sleep 100)
+    ;; Verify that the task was GC'd
+    (is (= @a :finalized))
+    ;; Complete the map
+    (deliver p :done)
+    @task-runner))
+
+(deftest test-map-holding
+  (testing (format "map doesn't hold the head of lazy sequences")
+    (check-holding-thread (fn [_ f & as] (apply map f as)))))
+
+(deftest test-pmap-holding
+  (testing (format "pmap doesn't hold the head of lazy sequences")
+    (check-holding-thread cp/pmap)))
 
 (deftest test-pmap
   (testing "basic pmap test"
