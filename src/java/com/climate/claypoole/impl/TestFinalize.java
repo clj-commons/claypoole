@@ -17,7 +17,8 @@ import clojure.lang.IFn;
 
 /** A class that calls a function when it is finalized.
  *
- * This is helpful because gen-class is so much work.
+ * This is helpful for testing against memory leaks, and we do it in Java
+ * because gen-class is so much work.
  */
 public class TestFinalize extends Object {
   private IFn finalizeFn;
