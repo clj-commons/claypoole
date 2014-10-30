@@ -17,9 +17,20 @@
     [com.climate.claypoole.impl :as impl]))
 
 
-(deftest test-map-indexed-with-rest
-  (is (= (impl/map-indexed-with-rest vector [:x :y :z])
-         '([0 :x ([1 :y ([2 :z ()])]
-                  [2 :z ()])]
-           [1 :y ([2 :z ()])]
-           [2 :z ()]))))
+(deftest test-queue-seq
+  (let [[q qs] (impl/queue-seq)]
+    (doseq [i (range 10)]
+      (impl/queue-seq-add! q i))
+    (impl/queue-seq-end! q)
+    (is (= (range 10) qs))))
+
+(deftest test-lazy-co-read
+  (let [s1 (range 10)
+        s2 (concat (range 10) (lazy-seq (deref (promise))))]
+    (is (= (map #(list % %) (range 10))
+           (impl/lazy-co-read s1 s2)))))
+
+(deftest test-subseqs
+  (let [n 10]
+    (is (= (impl/subseqs (range n))
+           (map #(drop % (range n)) (range (inc n)))))))

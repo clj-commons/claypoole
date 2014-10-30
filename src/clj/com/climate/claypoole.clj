@@ -42,6 +42,16 @@
   handy for testing."
   true)
 
+(def ^:dynamic *default-pmap-buffer*
+  "This is an advanced configuration option. You probably don't need to set
+  this!
+
+  When doing a pmap, Claypoole pushes input tasks into the threadpool. It
+  normally tries to keep the threadpool full, plus it adds a buffer of size
+  nthreads. If it can't find out the number of threads in the threadpool, it
+  just tries to keep *default-pmap-buffer* tasks in the pool."
+  200)
+
 (defn ncpus
   "Get the number of available CPUs."
   []
@@ -268,89 +278,111 @@
   `(future-call ~pool (^{:once true} fn future-body [] ~@body)))
 
 (defn- make-canceller
-  "Creates a function to cancel a bunch of futures."
-  [future-reader]
+  "Creates a function to cancel a pmap."
+  [driver]
   (let [first-already-cancelled (atom Long/MAX_VALUE)]
-    (fn [i future-seq]
+    (fn [i later-tasks]
       (let [cancel-end @first-already-cancelled]
         ;; Don't re-kill futures we've already zapped to prevent an O(n^2)
         ;; explosion.
         (when (< i cancel-end)
           (swap! first-already-cancelled min i)
-          ;; Kill the future reader.
-          (future-cancel future-reader)
+          ;; Kill the pmap driver thread.
+          (future-cancel driver)
           ;; Stop the tasks above i before cancel-end.
-          (doseq [f (->> future-seq (take (- cancel-end i)))]
+          (doseq [f (->> later-tasks rest (take (- cancel-end i)))]
             (future-cancel f)))))))
+
+(defn- buffer-blocking-seq
+  "Make a lazy sequence that blocks when the map's (imaginary) buffer is full."
+  [pool unordered-results]
+  (let [buffer-size (if-let [pool-size (impl/get-pool-size pool)]
+                      (* 2 pool-size)
+                      *default-pmap-buffer*)]
+    (concat (repeat buffer-size nil)
+            unordered-results)))
 
 (defn- pmap-core
   "Given functions to customize for pmap or upmap, create a function that does
   the hard work of pmap."
-  [send-result read-result]
-  (fn [pool f arg-seqs]
-    (let [[shutdown? pool] (impl/->threadpool pool)
-          ;; Use map to handle the argument sequences.
-          args (apply map vector (map impl/unchunk arg-seqs))
-          ;; Pre-declare the canceller because it needs the tasks but the tasks
-          ;; need it too.
-          canceller (promise)
-          start-task (fn [i a later-tasks]
-                       ;; We can't directly make a future add itself to a
-                       ;; queue.  Instead, we use a promise for indirection.
-                       (let [p (promise)]
-                         (deliver p (future-call
-                                      pool
-                                      (with-meta
-                                        ;; Try to run the task, but
-                                        ;; definitely add the future to
-                                        ;; the queue.
-                                        #(try
-                                           (let [result (apply f a)]
-                                             (send-result @p)
-                                             result)
-                                           ;; Even if we had an error
-                                           ;; running the task, make sure the
-                                           ;; future shows up in the queue.
-                                           (catch Throwable t
-                                             ;; We've still got to send that
-                                             ;; result, even if it was an
-                                             ;; exception, and we have to do it
-                                             ;; before we start the canceller.
-                                             (send-result @p)
-                                             ;; If we've had an exception, kill
-                                             ;; future and ongoing processes.
-                                             (@canceller i later-tasks)
-                                             ;; Re-throw that throwable!
-                                             (throw t)))
-                                        ;; Add the args to the function's
-                                        ;; metadata for prioritization.
-                                        {:args a})))
-                         @p))
-          futures (impl/map-indexed-with-rest start-task args)
-          ;; Start all the tasks in a real future, so we don't block.
-          read-future (core/future
-                        (try
-                          ;; Force all those futures to start.
-                          (dorun futures)
-                          ;; If we created a temporary pool, shut it down.
-                          (finally (when shutdown? (shutdown pool)))))]
-      (deliver canceller (make-canceller read-future))
-      ;; Read results as available.
-      (concat (map read-result futures)
-              ;; Deref the read-future to get its exceptions, if it has any.
-              (lazy-seq (try @read-future
-                          ;; But if it was cancelled, the user doesn't care.
-                          (catch CancellationException e)))))))
+  [pool ordered? f arg-seqs]
+  (let [[shutdown? pool] (impl/->threadpool pool)
+        ;; Use map to handle the argument sequences.
+        args (apply map vector (map impl/unchunk arg-seqs))
+        ;; Pre-declare the canceller because it needs the tasks but the tasks
+        ;; need it too.
+        canceller (promise)
+        ;; Set up queues of tasks and results
+        [task-q tasks] (impl/queue-seq)
+        [unordered-results-q unordered-results] (impl/queue-seq)
+        ;; This is how we'll actually make things go.
+        start-task (fn [i a later-tasks]
+                     ;; We can't directly make a future add itself to a
+                     ;; queue. Instead, we use a promise for indirection.
+                     (let [p (promise)]
+                       (deliver p (future-call
+                                    pool
+                                    (with-meta
+                                      ;; Try to run the task, but definitely
+                                      ;; add the future to the queue.
+                                      #(try
+                                         (let [result (apply f a)]
+                                           (impl/queue-seq-add!
+                                             unordered-results-q @p)
+                                           result)
+                                         ;; Even if we had an error running
+                                         ;; the task, make sure the future
+                                         ;; shows up in the queue.
+                                         (catch Throwable t
+                                           ;; We've still got to send that
+                                           ;; result, even if it was an
+                                           ;; exception, and we have to do it
+                                           ;; before we start the canceller.
+                                           (impl/queue-seq-add!
+                                             unordered-results-q @p)
+                                           ;; If we've had an exception, kill
+                                           ;; future and ongoing processes.
+                                           (@canceller i later-tasks)
+                                           ;; Re-throw that throwable!
+                                           (throw t)))
+                                      ;; Add the args to the function's
+                                      ;; metadata for prioritization.
+                                      {:args a})))
+                       @p))
+        ;; Start all the tasks in a real future, so we don't block.
+        driver (core/future
+                 (try
+                   (doseq [[i a later-tasks _]
+                           (map vector (range) args (impl/subseqs tasks)
+                                ;; The driver thread reads from this sequence
+                                ;; and ignores the result, just to get the side
+                                ;; effect of blocking when the map's
+                                ;; (imaginary) buffer is full.
+                                (buffer-blocking-seq pool unordered-results))]
+                     (impl/queue-seq-add! task-q (start-task i a later-tasks)))
+                   (finally
+                     (impl/queue-seq-end! task-q)
+                     (when shutdown? (shutdown pool)))))]
+    (deliver canceller (make-canceller driver))
+    ;; Read results as available.
+    (concat (map deref
+                 (if ordered?
+                   tasks
+                   (map second (impl/lazy-co-read tasks unordered-results))))
+            ;; Deref the read-future to get its exceptions, if it has any.
+            (lazy-seq (try @driver
+                        ;; But if it was cancelled, the user doesn't care.
+                        (catch CancellationException e))))))
 
 (defn- pmap-boilerplate
   "Do boilerplate pmap checks, then call the real pmap function."
-  [pool f arg-seqs pmap-fn]
+  [pool ordered? f arg-seqs]
   (when (empty? arg-seqs)
     (throw (IllegalArgumentException.
              "pmap requires at least one sequence to map over")))
   (if (serial? pool)
     (doall (apply map f arg-seqs))
-    (pmap-fn pool f arg-seqs)))
+    (pmap-core pool ordered? f arg-seqs)))
 
 (defn pmap
   "Like clojure.core.pmap, except:
@@ -373,23 +405,13 @@
        serial via (doall map). This may be helpful during profiling, for example.
   "
   [pool f & arg-seqs]
-  (pmap-boilerplate pool f arg-seqs
-                    ;; pmap is easy--just deref the futures.
-                    (let [send-result (constantly nil)
-                          read-result deref]
-                      (pmap-core send-result read-result))))
+  (pmap-boilerplate pool true f arg-seqs))
 
 (defn upmap
   "Like pmap, except that the return value is a sequence of results ordered by
   *completion time*, not by input order."
   [pool f & arg-seqs]
-  (pmap-boilerplate pool f arg-seqs
-                    ;; upmap is a little complex; read data out of a queue to
-                    ;; get the earliest-available data.
-                    (let [q (LinkedBlockingQueue.)
-                          send-result (fn [result] (.add q result))
-                          read-result (fn [_] (-> q .take deref))]
-                      (pmap-core send-result read-result))))
+  (pmap-boilerplate pool false f arg-seqs))
 
 (defn pcalls
   "Like clojure.core.pcalls, except it takes a threadpool. For more detail on

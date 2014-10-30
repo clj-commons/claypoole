@@ -603,6 +603,35 @@
     (deliver finish :done)
     @task-runner))
 
+(defn check-read-ahead
+  "Verify that this pmap function does not read too far ahead in the input
+  sequence, as that can cause unnecessary use of RAM."
+  [pmap-fn]
+  (let [a (atom nil)
+        indicator #(do (reset! a %) a)
+        finish (promise)
+        started (promise)
+        results (pmap-fn 4 deref
+                         (concat ;; indicate we've started
+                                 (repeatedly 1 #(do (deliver started true)
+                                                  started))
+                                 ;; block the map
+                                 (repeat 10 finish)
+                                 ;; a long runway
+                                 (map atom (range 100))
+                                 ;; an indicator for whether we've realized
+                                 ;; past the runway
+                                 (map indicator [:started])))]
+    ;; Let the tasks run
+    @started
+    ;; Let the threadpool run unchecked for a minute
+    (Thread/sleep 100)
+    ;; Verify that the indicator wasn't triggered
+    (is (= nil @a))
+    ;; Complete the map
+    (deliver finish :done)
+    (dorun results)))
+
 (defn check-shuts-off
   [pmap-like]
   (cp/with-shutdown! [pool 2]
@@ -649,6 +678,8 @@
   (when lazy?
     (testing (format "%s doesn't hold the head of lazy sequences" fn-name)
       (check-holding-thread pmap-like))
+    (testing (format "%s doesn't read ahead in the input sequence" fn-name)
+      (check-read-ahead pmap-like))
     (testing (format "%s can be chained in various threadpools" fn-name)
              (check-chaining pmap-like))
     (testing (format "%s stops processing when an exception occurs" fn-name)
