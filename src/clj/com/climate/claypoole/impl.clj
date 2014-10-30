@@ -29,6 +29,7 @@
      Executors
      ExecutorService
      Future
+     LinkedBlockingQueue
      ScheduledExecutorService
      ThreadFactory
      TimeoutException
@@ -214,23 +215,54 @@
                      (str "Claypoole functions require a threadpool, a "
                           "number, :builtin, or :serial, not %s.") arg)))))
 
-(defn map-indexed-with-rest
-  "Given f and xs, return a sequence of (f i x s) for every x in xs where
-  s is the results of the rest of the map.
+(defn get-pool-size
+  "If the pool has a max size, get that; else, return nil."
+  [pool]
+  (cond
+    (instance? java.util.concurrent.ScheduledThreadPoolExecutor pool)
+    (.getCorePoolSize pool)
 
-  i.e. (map-indexed-with-rest #(do (prn [%1 %2 %3]) %2) [:x :y :z])
-  would print
-    [0 :x (:y :z)]
-    [1 :y (:z)]
-    [2 :z ()]
+    (instance? java.util.concurrent.ThreadPoolExecutor pool)
+    (.getMaximumPoolSize pool)
 
-  This is handy for lazy sequences that might need to see later elements
-  in the sequence, e.g. for cancelling futures."
-  [f xs & [i]]
-  (lazy-seq
-    (when (not (empty? xs))
-      (let [i (or i 0)
-            x (first xs)
-            more (rest xs)
-            results (map-indexed-with-rest f more (inc i))]
-        (cons (f i x results) results)))))
+    :else
+    nil))
+
+(let [marker (Object.)]
+  (defn- queue-reader
+    "Make a lazy sequence from a queue."
+    [q]
+    (lazy-seq
+      (let [x (.take q)]
+        (when-not (identical? x marker)
+          (cons x (queue-reader q))))))
+
+  (defn queue-seq
+    "Create a queue and a lazy sequence that reads from that queue."
+    []
+    (let [q (LinkedBlockingQueue.)]
+      [q (queue-reader q)]))
+
+  (defn queue-seq-add!
+    "Add an item to a queue (and its lazy sequence)."
+    [q x]
+    (.add q x))
+
+  (defn queue-seq-end!
+    "End a lazy sequence reading from a queue."
+    [q]
+    (queue-seq-add! q marker)))
+
+(defn lazy-co-read
+  "Zip s1 and s2, stopping when s1 stops. This helps avoid potential stalls
+  when trying to read queue sequences."
+  [s1 s2]
+  (lazy-seq (when-not (empty? s1)
+              (cons [(first s1) (first s2)]
+                    (lazy-co-read (rest s1) (rest s2))))))
+
+(defn subseqs
+  "Given a sequence s, return a lazy, non-head-holding sequence of
+  (s (drop 1 s) (drop 2 s) ... '())"
+  [s]
+  (reductions (fn [l _] (rest l)) s s))
