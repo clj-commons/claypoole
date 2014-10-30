@@ -229,8 +229,8 @@
     nil))
 
 ;; Queue-seq needs a unique item that, when seen in a queue, indicates that the
-;; sequence has ended. It uses this private object, and uses identical? to
-;; check against this object's (unique) memory address.
+;; sequence has ended. It uses the private object end-marker, and uses
+;; identical? to check against this object's (unique) memory address.
 (let [end-marker (Object.)]
 
   (defn- queue-reader

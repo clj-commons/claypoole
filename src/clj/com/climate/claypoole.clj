@@ -48,7 +48,7 @@
 
   When doing a pmap, Claypoole pushes input tasks into the threadpool. It
   normally tries to keep the threadpool full, plus it adds a buffer of size
-  nthreads. If it can't find out the number of thread in the threadpool, it
+  nthreads. If it can't find out the number of threads in the threadpool, it
   just tries to keep *default-pmap-buffer* tasks in the pool."
   200)
 
@@ -278,8 +278,8 @@
   `(future-call ~pool (^{:once true} fn future-body [] ~@body)))
 
 (defn- make-canceller
-  "Creates a function to cancel a bunch of futures."
-  [future-reader]
+  "Creates a function to cancel a pmap."
+  [driver]
   (let [first-already-cancelled (atom Long/MAX_VALUE)]
     (fn [i later-tasks]
       (let [cancel-end @first-already-cancelled]
@@ -287,8 +287,8 @@
         ;; explosion.
         (when (< i cancel-end)
           (swap! first-already-cancelled min i)
-          ;; Kill the future reader.
-          (future-cancel future-reader)
+          ;; Kill the pmap driver thread.
+          (future-cancel driver)
           ;; Stop the tasks above i before cancel-end.
           (doseq [f (->> later-tasks rest (take (- cancel-end i)))]
             (future-cancel f)))))))
