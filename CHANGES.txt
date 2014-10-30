@@ -1,5 +1,9 @@
 CHANGES
 
+0.3.3
+
+- Fixed memory leak / overeager pushing of tasks into the queue
+
 0.3.2
 
 - Fixed memory leak / holding of head of lazy sequences
