@@ -42,6 +42,16 @@
   handy for testing."
   true)
 
+(def ^:dynamic *default-pmap-buffer*
+  "This is an advanced configuration option. You probably don't need to set
+  this!
+
+  When doing a pmap, Claypoole pushes input tasks into the threadpool. It
+  normally tries to keep the threadpool full, plus it adds a buffer of size
+  nthreads. If it can't find out the number of thread in the threadpool, it
+  just tries to keep *default-pmap-buffer* tasks in the pool."
+  200)
+
 (defn ncpus
   "Get the number of available CPUs."
   []
@@ -283,6 +293,15 @@
           (doseq [f (->> later-tasks rest (take (- cancel-end i)))]
             (future-cancel f)))))))
 
+(defn- buffer-blocking-seq
+  "Make a lazy sequence that blocks when the map's (imaginary) buffer is full."
+  [pool unordered-results]
+  (let [buffer-size (if-let [pool-size (impl/get-pool-size pool)]
+                      (* 2 pool-size)
+                      *default-pmap-buffer*)]
+    (concat (repeat buffer-size nil)
+            unordered-results)))
+
 (defn- pmap-core
   "Given functions to customize for pmap or upmap, create a function that does
   the hard work of pmap."
@@ -332,15 +351,15 @@
                                         {:args a})))
                          @p))
           ;; Start all the tasks in a real future, so we don't block.
-          readahead (* 2 (or (impl/get-pool-size pool) 100))
           driver (core/future
                    (try
                      (doseq [[i a later-tasks _]
                              (map vector (range) args (impl/subseqs tasks)
-                                  ;; force the results so we don't get
-                                  ;; ahead of ourselves
-                                  (concat (repeat readahead nil)
-                                          unordered-results))]
+                                  ;; The driver thread reads from this sequence
+                                  ;; and ignores the result, just to get the
+                                  ;; side effect of blocking when the map's
+                                  ;; (imaginary) buffer is full.
+                                  (buffer-blocking-seq pool unordered-results))]
                        (impl/queue-seq-add! task-q (start-task i a later-tasks)))
                      (finally
                        (impl/queue-seq-end! task-q)

@@ -228,13 +228,18 @@
     :else
     nil))
 
-(let [marker (Object.)]
+;; Queue-seq needs a unique item that, when seen in a queue, indicates that the
+;; sequence has ended. It uses this private object, and uses identical? to
+;; check against this object's (unique) memory address.
+(let [end-marker (Object.)]
+
   (defn- queue-reader
-    "Make a lazy sequence from a queue."
+    "Make a lazy sequence from a queue, stopping upon reading the unique
+    end-marker object."
     [q]
     (lazy-seq
       (let [x (.take q)]
-        (when-not (identical? x marker)
+        (when-not (identical? x end-marker)
           (cons x (queue-reader q))))))
 
   (defn queue-seq
@@ -251,11 +256,21 @@
   (defn queue-seq-end!
     "End a lazy sequence reading from a queue."
     [q]
-    (queue-seq-add! q marker)))
+    (queue-seq-add! q end-marker)))
 
 (defn lazy-co-read
-  "Zip s1 and s2, stopping when s1 stops. This helps avoid potential stalls
-  when trying to read queue sequences."
+  "Zip s1 and s2, stopping when s1 stops. This helps avoid potential blocking
+  when trying to read queue sequences.
+
+  In particular, this will block:
+    (map vector
+         (range 10)
+         (concat (range 10) (lazy-seq (deref (promise)))))
+  even though we only can read 10 things. Lazy-co-read fixes that case by
+  checking the first sequence first, so this will not block:
+    (lazy-co-read
+      (range 10)
+      (concat (range 10) (lazy-seq (deref (promise)))))"
   [s1 s2]
   (lazy-seq (when-not (empty? s1)
               (cons [(first s1) (first s2)]
