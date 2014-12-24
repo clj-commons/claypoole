@@ -44,7 +44,7 @@
                                       (with-meta #(apply f a)
                                                  {:args a}))))
          ;; force buffer-size futures to start work in the pool
-         (forceahead buffer-size)
+         (forceahead (or buffer-size (impl/get-pool-size pool) 0))
          ;; read the results from the futures
          (map deref)
          (pool-closer shutdown? pool))))
@@ -56,7 +56,7 @@
   Unlike core pmap, it doesn't assume the buffer size is nprocessors + 2;
   instead, it tries to fill the pool."
   [pool f & colls]
-  (apply pmap-manual pool (impl/get-pool-size pool) f colls))
+  (apply pmap-manual pool nil f colls))
 
 (defn upmap-manual
   "Like pmap-manual, but with results returned in the order they completed.
@@ -66,6 +66,7 @@
   background."
   [pool buffer-size f & colls]
   (let [[shutdown? pool] (impl/->threadpool pool)
+        buffer-size (or buffer-size (impl/get-pool-size pool) 0)
         result-q (LinkedBlockingQueue. (int buffer-size))
         run-one (fn [a]
                   (let [p (promise)]
@@ -125,6 +126,8 @@
   threadpool argument, see upmap."
   [pool & exprs]
   `(upcalls ~pool ~@(for [e exprs] `(fn [] ~e))))
+
+;; TODO add pfor-manual upfor-manual?
 
 (defmacro pfor
   "A parallel version of for. It is like for, except it takes a threadpool and
