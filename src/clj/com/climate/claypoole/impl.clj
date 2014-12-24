@@ -220,10 +220,10 @@
   [pool]
   (cond
     (instance? java.util.concurrent.ScheduledThreadPoolExecutor pool)
-    (.getCorePoolSize pool)
+    (.getCorePoolSize ^java.util.concurrent.ScheduledThreadPoolExecutor pool)
 
     (instance? java.util.concurrent.ThreadPoolExecutor pool)
-    (.getMaximumPoolSize pool)
+    (.getMaximumPoolSize ^java.util.concurrent.ThreadPoolExecutor pool)
 
     :else
     nil))
@@ -236,7 +236,7 @@
   (defn- queue-reader
     "Make a lazy sequence from a queue, stopping upon reading the unique
     end-marker object."
-    [q]
+    [^LinkedBlockingQueue q]
     (lazy-seq
       (let [x (.take q)]
         (when-not (identical? x end-marker)
@@ -250,7 +250,7 @@
 
   (defn queue-seq-add!
     "Add an item to a queue (and its lazy sequence)."
-    [q x]
+    [^LinkedBlockingQueue q x]
     (.add q x))
 
   (defn queue-seq-end!
