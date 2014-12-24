@@ -49,9 +49,10 @@ claypoole's version of one of these standard Clojure functions:
 * `for`
 
 Instead of lazy sequences, our functions will return eagerly streaming
-sequences. Such a sequence basically looks like `(map deref futures)`--all the
-requested work is being done behind the scenes, and reading the sequence will
-only block on uncompleted work.
+sequences. Such a sequence basically looks like `(map deref futures)` with a
+thread in the background running `doall` on it, so all the requested work is
+being done behind the scenes. Reading the sequence will only block on
+uncompleted work.
 
 Note that these functions are eager! That's on purpose--we like to be able to
 start work going and know it'll get done. But if you try to `pmap` over
