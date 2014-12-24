@@ -281,3 +281,38 @@
   (s (drop 1 s) (drop 2 s) ... '())"
   [s]
   (reductions (fn [l _] (rest l)) s s))
+
+(defn with-priority-fn
+  "Make a priority-threadpool wrapper that uses a given priority function.
+
+  The priority function is applied to a pmap'd function's arguments. e.g.
+
+    (upmap (with-priority-fn p (fn [x _] x)) + [6 5 4] [1 2 3])
+
+  will use pool p to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
+  with priorities [6 5 4]."
+  ^PriorityThreadpool [^PriorityThreadpool pool priority-fn]
+  (let [^PriorityThreadpoolImpl pool* (.pool pool)]
+    (PriorityThreadpool. pool* priority-fn)))
+
+(defn pfor-internal
+  "Do the messy parsing of the :priority from the for bindings."
+  [pool bindings body pmap-fn-sym]
+  (when (vector? pool)
+    (throw (IllegalArgumentException.
+             (str "Got a vector instead of a pool--"
+                  "did you forget to use a threadpool?"))))
+  (if-not (= :priority (first (take-last 2 bindings)))
+    ;; If there's no priority, everything is simple.
+    `(~pmap-fn-sym ~pool #(%) (for ~bindings (fn [] ~@body)))
+    ;; If there's a priority, God help us--let's pull that thing out.
+    (let [bindings* (vec (drop-last 2 bindings))
+          priority-value (last bindings)]
+      `(let [pool# (with-priority-fn ~pool (fn [_# p#] p#))
+             ;; We can't just make functions; we have to have the priority as
+             ;; an argument to work with the priority-fn.
+             [fns# priorities#] (apply map vector
+                                       (for ~bindings*
+                                         [(fn [priority#] ~@body)
+                                          ~priority-value]))]
+         (~pmap-fn-sym pool# #(%1 %2) fns# priorities#)))))

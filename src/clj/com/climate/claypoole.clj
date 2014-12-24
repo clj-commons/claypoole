@@ -128,8 +128,7 @@
   will use pool p to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
   with priorities [6 5 4]."
   ^PriorityThreadpool [^PriorityThreadpool pool priority-fn]
-  (let [^PriorityThreadpoolImpl pool* (.pool pool)]
-    (PriorityThreadpool. pool* priority-fn)))
+  (impl/with-priority-fn pool priority-fn))
 
 (defn with-priority
   "Make a priority-threadpool wrapper with a given fixed priority.
@@ -439,28 +438,6 @@
   [pool & exprs]
   `(upcalls ~pool ~@(for [e exprs] `(fn [] ~e))))
 
-(defn- pfor-internal
-  "Do the messy parsing of the :priority from the for bindings."
-  [pool bindings body pmap-fn-sym]
-  (when (vector? pool)
-    (throw (IllegalArgumentException.
-             (str "Got a vector instead of a pool--"
-                  "did you forget to use a threadpool?"))))
-  (if-not (= :priority (first (take-last 2 bindings)))
-    ;; If there's no priority, everything is simple.
-    `(~pmap-fn-sym ~pool #(%) (for ~bindings (fn [] ~@body)))
-    ;; If there's a priority, God help us--let's pull that thing out.
-    (let [bindings* (vec (drop-last 2 bindings))
-          priority-value (last bindings)]
-      `(let [pool# (with-priority-fn ~pool (fn [_# p#] p#))
-             ;; We can't just make functions; we have to have the priority as
-             ;; an argument to work with the priority-fn.
-             [fns# priorities#] (apply map vector
-                                       (for ~bindings*
-                                         [(fn [priority#] ~@body)
-                                          ~priority-value]))]
-         (~pmap-fn-sym pool# #(%1 %2) fns# priorities#)))))
-
 (defmacro pfor
   "A parallel version of for. It is like for, except it takes a threadpool and
   is parallel. For more detail on its parallelism and on its threadpool
@@ -479,10 +456,10 @@
         (complex-computation i))
   "
   [pool bindings & body]
-  (pfor-internal pool bindings body `pmap))
+  (impl/pfor-internal pool bindings body `pmap))
 
 (defmacro upfor
   "Like pfor, except the return value is a sequence of results ordered by
   *completion time*, not by input order."
   [pool bindings & body]
-  (pfor-internal pool bindings body `upmap))
+  (impl/pfor-internal pool bindings body `upmap))
