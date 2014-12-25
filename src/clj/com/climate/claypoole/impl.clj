@@ -251,7 +251,7 @@
   (defn queue-seq-add!
     "Add an item to a queue (and its lazy sequence)."
     [^LinkedBlockingQueue q x]
-    (.add q x))
+    (.put q x))
 
   (defn queue-seq-end!
     "End a lazy sequence reading from a queue."

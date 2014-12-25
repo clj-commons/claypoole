@@ -75,7 +75,7 @@
                                 pool
                                 ;; Use with-meta for priority threadpools
                                 (with-meta #(try (apply f a)
-                                                 (finally (.add result-q @p)))
+                                                 (finally (.put result-q @p)))
                                            {:args a})))))]
     (->> colls
          ;; use map to take care of argument alignment
