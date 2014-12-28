@@ -335,7 +335,7 @@
 
 (defn check-parallel
   "Check that a pmap function actually runs in parallel."
-  [pmap-like ordered?]
+  [pmap-like ordered? & [lazy?]]
   (let [n 10]
     (cp/with-shutdown! [pool n]
       (let [pool (cp/threadpool n)
@@ -366,6 +366,9 @@
                                    (deliver (promise-chain (inc i)) i))
                                  i)
                                input)]
+        ;; If it's a truly lazy function, we have to force the sequence to make
+        ;; the futures start.
+        (when lazy? (future (doall results)))
         ;; All tasks should have started after 100ms.
         (Thread/sleep 100)
         (is (= (set @started) (set input)))
@@ -373,8 +376,6 @@
         (is (= @started (distinct @started)))
         ;; Start the first task.
         (deliver (first promise-chain) nil)
-        ;; Tasks should complete in numerical order, the opposite of the order
-        ;; they were submitted in.
         (is (= results (if ordered?
                          ;; If we're doing an ordered operation, we expect to
                          ;; see them in the order we submitted them.
@@ -386,7 +387,7 @@
 
 (defn check-lazy-read
   "Check that a pmap function reads lazily"
-  [pmap-like]
+  [pmap-like & [lazy?]]
   (let [n 10]
     (cp/with-shutdown! [pool n]
       (let [pool (cp/threadpool n)
@@ -401,6 +402,8 @@
             results (pmap-like pool
                                (fn [i] (swap! started conj i) i)
                                input)]
+        ;; When genuinely lazy, we must force the sequence to start tasks.
+        (when lazy? (future (doall results)))
         ;; All of the first set of tasks should have started after 100ms.
         (Thread/sleep 100)
         (is (= @started (set first-inputs)))
@@ -606,7 +609,7 @@
 (defn check-read-ahead
   "Verify that this pmap function does not read too far ahead in the input
   sequence, as that can cause unnecessary use of RAM."
-  [pmap-fn]
+  [pmap-fn & [lazy?]]
   (let [a (atom nil)
         indicator #(do (reset! a %) a)
         finish (promise)
@@ -622,6 +625,8 @@
                                  ;; an indicator for whether we've realized
                                  ;; past the runway
                                  (map indicator [:started])))]
+    ;; When genuinely lazy, we must force the sequence to start tasks.
+    (when lazy? (future (doall results)))
     ;; Let the tasks run
     @started
     ;; Let the threadpool run unchecked for a minute
@@ -655,10 +660,20 @@
       (is (< 1 (count results) 100)))))
 
 (defn check-all
-  "Run all checks on a pmap function."
-  [fn-name pmap-like ordered? lazy?]
+  "Run all checks on a pmap function.
+
+  Arguments:
+    fn-name     - the function's name for better logging/output
+    pmap-like   - a function that works like pmap
+    ordered?    - true iff the pmap function returns results in the same order
+    streaming?  - true iff the pmap function works on streaming sequences
+    lazy?       - true iff the pmap function needs to be \"pumped\" by doall"
+  [fn-name pmap-like ordered? streaming? lazy?]
+  (testing (format "%s maps" fn-name)
+    (is (= (range 1 11) ((if ordered? identity sort)
+                         (pmap-like 3 inc (range 10))))))
   (testing (format "%s runs n things at once" fn-name)
-    (check-parallel pmap-like ordered?))
+    (check-parallel pmap-like ordered? lazy?))
   (testing (format "%s emits exceptions correctly" fn-name)
     (check-fn-exception pmap-like))
   (testing (format "%s emits non-Exception Throwables correctly" fn-name)
@@ -675,15 +690,17 @@
   (testing (format "%s throws exceptions when tasks are sent to a shutdown pool"
                    fn-name)
     (check-shutdown-exceptions pmap-like))
-  (when lazy?
-    (testing (format "%s doesn't hold the head of lazy sequences" fn-name)
+  (when streaming?
+    (testing (format "%s doesn't hold the head of streaming sequences" fn-name)
       (check-holding-thread pmap-like))
     (testing (format "%s doesn't read ahead in the input sequence" fn-name)
-      (check-read-ahead pmap-like))
+      (check-read-ahead pmap-like lazy?))
     (testing (format "%s can be chained in various threadpools" fn-name)
              (check-chaining pmap-like))
     (testing (format "%s stops processing when an exception occurs" fn-name)
-             (check-shuts-off pmap-like))))
+             (check-shuts-off pmap-like))
+    (testing (format "%s reads lazily" fn-name)
+      (check-lazy-read pmap-like lazy?))))
 
 
 (deftest test-daemon
@@ -745,20 +762,10 @@
       (check-chaining pmap-like))))
 
 (deftest test-pmap
-  (testing "basic pmap test"
-    (cp/with-shutdown! [pool 3]
-      (is (= (range 1 11) (cp/pmap pool inc (range 10))))))
-  (check-all "pmap" cp/pmap true true)
-  (testing "pmap reads lazily"
-    (check-lazy-read cp/pmap)))
+  (check-all "pmap" cp/pmap true true false))
 
 (deftest test-upmap
-  (testing "basic upmap test"
-    (cp/with-shutdown! [pool 3]
-      (is (= (range 1 11) (sort (cp/upmap pool inc (range 10)))))))
-  (check-all "upmap" cp/upmap false true)
-  (testing "upmap reads lazily"
-    (check-lazy-read cp/upmap)))
+  (check-all "upmap" cp/upmap false true false))
 
 (deftest test-pcalls
   (testing "basic pcalls test"
@@ -771,7 +778,7 @@
               pool
               (for [i input]
                 #(work i))))]
-    (check-all "pcalls" pmap-like true true)))
+    (check-all "pcalls" pmap-like true true false)))
 
 (deftest test-upcalls
   (testing "basic pcalls test"
@@ -784,7 +791,7 @@
               pool
               (for [i input]
                 #(work i))))]
-    (check-all "upcalls" pmap-like false true)))
+    (check-all "upcalls" pmap-like false true false)))
 
 (deftest test-pvalues
   (testing "basic pvalues test"
@@ -800,7 +807,7 @@
                       ~@(for [i input]
                           (list worksym i)))))
                  pool work)))]
-    (check-all "pvalues" pmap-like true false)))
+    (check-all "pvalues" pmap-like true false false)))
 
 (deftest test-upvalues
   (testing "basic upvalues test"
@@ -816,7 +823,7 @@
                       ~@(for [i input]
                           (list worksym i)))))
                  pool work)))]
-    (check-all "upvalues" pmap-like false false)))
+    (check-all "upvalues" pmap-like false false false)))
 
 (deftest test-pfor
   (testing "basic pfor test"
@@ -828,9 +835,7 @@
               pool
               [i input]
               (work i)))]
-    (check-all "pfor" pmap-like true true)
-    (testing "pfor reads lazily"
-      (check-lazy-read pmap-like))))
+    (check-all "pfor" pmap-like true true false)))
 
 (deftest test-upfor
   (testing "basic upfor test"
@@ -842,6 +847,4 @@
               pool
               [i input]
               (work i)))]
-    (check-all "upfor" pmap-like false true)
-    (testing "upfor reads lazily"
-      (check-lazy-read pmap-like))))
+    (check-all "upfor" pmap-like false true false)))
