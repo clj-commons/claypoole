@@ -33,7 +33,7 @@ several ways:
   the amount of simultaneous work we're doing.
 * We would like it to be eagerly streaming rather than lazy, so we can start it
   going and expect it to work in the background without explicitly consuming
-  the results. *As of Claypoole 0.4.0, it provides lazy maps in
+  the results. *As of Claypoole 0.4.0, there are lazy maps in
   `com.climate.claypoole.lazy`. See the section [Lazy](#lazy) below.*
 * We would like to be able to do an unordered `pmap`, so that we can start
   handling the first response as fast as possible.
@@ -59,7 +59,7 @@ Note that these functions are eager! That's on purpose--we like to be able to
 start work going and know it'll get done. But if you try to `pmap` over
 `(range)`, you're going to have a bad time.
 
-*As of Claypoole 0.4.0, it provides lazy functions in
+*As of Claypoole 0.4.0, there are lazy functions in
 `com.climate.claypoole.lazy`. See the section [Lazy](#lazy) below.*
 
 ```clojure
