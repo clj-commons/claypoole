@@ -239,6 +239,14 @@ function also comes with a -buffer variant that allows you to specify the
 buffer size. The non -buffer forms use the threadpool size as their buffer
 size.
 
+For instance, these will both cause 10 items to be realized:
+
+```clojure
+(cp/with-shutdown! [pool 2]
+  (doall (take 8 (lazy/pmap pool inc (range))))
+  (doall (take 4 (lazy/pmap-buffer pool 6 inc (range)))))
+```
+
 The disadvantage of the lazy functions is that they may not keep the threadpool
 as busy. For instance, this pmap will take 6 milliseconds to run:
 
