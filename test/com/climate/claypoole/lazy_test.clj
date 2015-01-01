@@ -82,7 +82,7 @@
     ;; Exactly what we asked for, plus readahead, is realized.
     (is (= (+ 2 readahead) (count @started)))))
 
-(defn check-all-manual
+(defn check-all-buffer
   [fn-name manual-pmap-like ordered? streaming?]
   (check-all fn-name (fn [p f i] (manual-pmap-like p 10 f i))
              ordered? streaming?)
@@ -95,14 +95,14 @@
 (deftest test-pmap
   (check-all "pmap" lazy/pmap true true))
 
-(deftest test-pmap-manual
-  (check-all-manual "pmap-manual" lazy/pmap-manual true true))
+(deftest test-pmap-buffer
+  (check-all-buffer "pmap-buffer" lazy/pmap-buffer true true))
 
 (deftest test-upmap
   (check-all "upmap" lazy/upmap false true))
 
-(deftest test-upmap-manual
-  (check-all-manual "upmap-manual" lazy/upmap-manual false true))
+(deftest test-upmap-buffer
+  (check-all-buffer "upmap-buffer" lazy/upmap-buffer false true))
 
 (deftest test-pcalls
   (testing "basic pcalls test"
@@ -116,14 +116,14 @@
                 #(work i))))]
     (check-all "pcalls" pmap-like true true)))
 
-(deftest test-pcalls-manual
+(deftest test-pcalls-buffer
   (letfn [(pmap-like [pool buffer work input]
             (apply
-              lazy/pcalls-manual
+              lazy/pcalls-buffer
               pool buffer
               (for [i input]
                 #(work i))))]
-    (check-all-manual "pcalls-manual" pmap-like true true)))
+    (check-all-buffer "pcalls-buffer" pmap-like true true)))
 
 (deftest test-upcalls
   (testing "basic pcalls test"
@@ -137,14 +137,14 @@
                 #(work i))))]
     (check-all "upcalls" pmap-like false true)))
 
-(deftest test-upcalls-manual
+(deftest test-upcalls-buffer
   (letfn [(pmap-like [pool buffer work input]
             (apply
-              lazy/upcalls-manual
+              lazy/upcalls-buffer
               pool buffer
               (for [i input]
                 #(work i))))]
-    (check-all-manual "upcalls-manual" pmap-like false true)))
+    (check-all-buffer "upcalls-buffer" pmap-like false true)))
 
 (deftest test-pvalues
   (testing "basic pvalues test"
@@ -161,17 +161,17 @@
                  pool work)))]
     (check-all "pvalues" pmap-like true false)))
 
-(deftest test-pvalues-manual
+(deftest test-pvalues-buffer
   (letfn [(pmap-like [pool buffer work input]
             (let [worksym (gensym "work")]
               ((eval
                  `(fn [pool# buffer# ~worksym]
-                    (lazy/pvalues-manual
+                    (lazy/pvalues-buffer
                       pool# buffer#
                       ~@(for [i input]
                           (list worksym i)))))
                  pool buffer work)))]
-    (check-all-manual "pvalues-manual" pmap-like true false)))
+    (check-all-buffer "pvalues-buffer" pmap-like true false)))
 
 (deftest test-upvalues
   (testing "basic upvalues test"
@@ -188,17 +188,17 @@
                  pool work)))]
     (check-all "upvalues" pmap-like false false)))
 
-(deftest test-upvalues-manual
+(deftest test-upvalues-buffer
   (letfn [(pmap-like [pool buffer work input]
             (let [worksym (gensym "work")]
               ((eval
                  `(fn [pool# buffer# ~worksym]
-                    (lazy/upvalues-manual
+                    (lazy/upvalues-buffer
                       pool# buffer#
                       ~@(for [i input]
                           (list worksym i)))))
                  pool buffer work)))]
-    (check-all-manual "upvalues-manual" pmap-like false false)))
+    (check-all-buffer "upvalues-buffer" pmap-like false false)))
 
 (deftest test-pfor
   (testing "basic pfor test"
@@ -211,13 +211,13 @@
               (work i)))]
     (check-all "pfor" pmap-like true true)))
 
-(deftest test-pfor-manual
+(deftest test-pfor-buffer
   (letfn [(pmap-like [pool buffer work input]
-            (lazy/pfor-manual
+            (lazy/pfor-buffer
               pool buffer
               [i input]
               (work i)))]
-    (check-all-manual "pfor-manual" pmap-like true true)))
+    (check-all-buffer "pfor-buffer" pmap-like true true)))
 
 (deftest test-upfor
   (testing "basic upfor test"
@@ -230,10 +230,10 @@
               (work i)))]
     (check-all "upfor" pmap-like false true)))
 
-(deftest test-upfor-manual
+(deftest test-upfor-buffer
   (letfn [(pmap-like [pool buffer work input]
-            (lazy/upfor-manual
+            (lazy/upfor-buffer
               pool buffer
               [i input]
               (work i)))]
-    (check-all-manual "upfor-manual" pmap-like false true)))
+    (check-all-buffer "upfor-buffer" pmap-like false true)))

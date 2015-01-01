@@ -12,6 +12,23 @@
 ;; and limitations under the License.
 
 (ns com.climate.claypoole.lazy
+  "Lazy threadpool tools for Clojure.
+
+  This namespace provides lazy versions of the parallel functions from
+  com.climate.claypoole. They will only run the outputs you realize, plus a few
+  more (a buffer), just like core pmap. The buffer is used to help keep the
+  threadpool busy.
+
+  Each parallel function also comes with a -buffer variant that allows you to
+  specify the buffer size. The non -buffer forms use the threadpool size as
+  their buffer size.
+
+  To use the threadpool most efficiently with these lazy functions, prefer the
+  unordered versions (e.g. upmap), since the ordered ones may starve the
+  threadpool of work. For instance, this pmap will take 6 milliseconds to run:
+    (lazy/pmap 2 #(Thread/sleep %) [4 3 2 1])
+  That's because it will not realize the 2 task until the 4 task is complete,
+  so one thread in the pool will sit idle for 1 millisecond."
   (:refer-clojure :exclude [future future-call pcalls pmap pvalues])
   (:require [com.climate.claypoole :as cp]
             [com.climate.claypoole.impl :as impl])
@@ -36,13 +53,18 @@
               (when shutdown? (cp/shutdown pool))
               nil))))
 
-(defn pmap-manual
+(defn pmap-buffer
   "A lazy pmap where the work happens in a threadpool, just like core pmap, but
   using claypoole futures.
 
   Unlike core pmap, it doesn't assume the buffer size is nprocessors + 2;
   instead, you must specify how many tasks ahead will be run in the
-  background."
+  background.
+
+  If you
+    (doall (take 2 (pmap-buffer pool 10 inc (range 1000))))
+  then 12 inputs and outputs will be realized--the 2 you asked for, plus the 10
+  that are run in the buffer to keep the threadpool busy."
   [pool buffer-size f & colls]
   (if (cp/serial? pool)
     (apply map f colls)
@@ -69,12 +91,17 @@
   using claypoole futures.
 
   Unlike core pmap, it doesn't assume the buffer size is nprocessors + 2;
-  instead, it tries to fill the pool."
-  [pool f & colls]
-  (apply pmap-manual pool nil f colls))
+  instead, it tries to fill the pool.
 
-(defn upmap-manual
-  "Like pmap-manual, but with results returned in the order they completed.
+  If you
+    (doall (take 2 (pmap 10 inc (range 1000))))
+  then 12 inputs and outputs will be realized--the 2 you asked for, plus the 10
+  that are run in the buffer to keep the threadpool busy."
+  [pool f & colls]
+  (apply pmap-buffer pool nil f colls))
+
+(defn upmap-buffer
+  "Like pmap-buffer, but with results returned in the order they completed.
 
   Note that unlike core pmap, it doesn't assume the buffer size is nprocessors
   + 2; instead, you must specify how many tasks ahead will be run in the
@@ -113,49 +140,60 @@
   Note that unlike core pmap, it doesn't assume the buffer size is nprocessors
   + 2; instead, it tries to fill the pool."
   [pool f & colls]
-  (apply upmap-manual pool (impl/get-pool-size pool) f colls))
+  (apply upmap-buffer pool (impl/get-pool-size pool) f colls))
 
 (defn pcalls
-  "Like clojure.core.pcalls, except it takes a threadpool. For more detail on
-  its parallelism and on its threadpool argument, see pmap."
+  "Like clojure.core.pcalls, except it's lazy and it takes a threadpool. For
+  more detail on its parallelism and on its threadpool argument, see pmap."
   [pool & fs]
   (pmap pool #(%) fs))
 
-(defn pcalls-manual
+(defn pcalls-buffer
+  "Like clojure.core.pcalls, except it's lazy and it takes a threadpool and a
+  buffer size. For more detail on these arguments, see pmap-buffer."
   [pool buffer & fs]
-  (pmap-manual pool buffer #(%) fs))
+  (pmap-buffer pool buffer #(%) fs))
 
 (defn upcalls
-  "Like clojure.core.pcalls, except it takes a threadpool and returns results
-  ordered by completion time. For more detail on its parallelism and on its
-  threadpool argument, see upmap."
+  "Like clojure.core.pcalls, except it's lazy, it takes a threadpool, and it
+  returns results ordered by completion time. For more detail on its
+  parallelism and on its threadpool argument, see upmap."
   [pool & fs]
   (upmap pool #(%) fs))
 
-(defn upcalls-manual
+(defn upcalls-buffer
+  "Like clojure.core.pcalls, except it's lazy, it takes a threadpool and a
+  buffer size, and it returns results ordered by completion time. For more
+  detail on its parallelism and on its arguments, see upmap-buffer."
   [pool buffer & fs]
-  (upmap-manual pool buffer #(%) fs))
+  (upmap-buffer pool buffer #(%) fs))
 
 (defmacro pvalues
-  "Like clojure.core.pvalues, except it takes a threadpool. For more detail on
-  its parallelism and on its threadpool argument, see pmap."
+  "Like clojure.core.pvalues, except it's lazy and it takes a threadpool. For
+  more detail on its parallelism and on its threadpool argument, see pmap."
   [pool & exprs]
   `(pcalls ~pool ~@(for [e exprs] `(fn [] ~e))))
 
-(defmacro pvalues-manual
+(defmacro pvalues-buffer
+  "Like clojure.core.pvalues, except it's lazy and it takes a threadpool and a
+  buffer size. For more detail on its parallelism and on its arguments, see
+  pmap-buffer."
   [pool buffer & exprs]
-  `(pcalls-manual ~pool ~buffer ~@(for [e exprs] `(fn [] ~e))))
+  `(pcalls-buffer ~pool ~buffer ~@(for [e exprs] `(fn [] ~e))))
 
 (defmacro upvalues
-  "Like clojure.core.pvalues, except it takes a threadpool and returns results
-  ordered by completion time. For more detail on its parallelism and on its
-  threadpool argument, see upmap."
+  "Like clojure.core.pvalues, except it's lazy, it takes a threadpool, and it
+  returns results ordered by completion time. For more detail on its
+  parallelism and on its threadpool argument, see upmap."
   [pool & exprs]
   `(upcalls ~pool ~@(for [e exprs] `(fn [] ~e))))
 
-(defmacro upvalues-manual
+(defmacro upvalues-buffer
+  "Like clojure.core.pvalues, except it's lazy, it takes a threadpool and a
+  buffer size, and it returns results ordered by completion time. For more
+  detail on its parallelism and on its arguments, see upmap-buffer."
   [pool buffer & exprs]
-  `(upcalls-manual ~pool ~buffer ~@(for [e exprs] `(fn [] ~e))))
+  `(upcalls-buffer ~pool ~buffer ~@(for [e exprs] `(fn [] ~e))))
 
 (defmacro pfor
   "A parallel version of for. It is like for, except it takes a threadpool and
@@ -177,12 +215,14 @@
   [pool bindings & body]
   (impl/pfor-internal pool bindings body `pmap))
 
-(defmacro pfor-manual
+(defmacro pfor-buffer
+  "Like pfor, but it takes a buffer size; see pmap-buffer for information about
+  this argument."
   [pool buffer bindings & body]
   ;; Instead of pmap, we'll use an inline function with the buffer thrown in
   ;; there. It's hacky, because it relies on exactly how pfor-internal expands,
   ;; but it works.
-  (let [pm `(fn [p# f# & cs#] (apply pmap-manual p# ~buffer f# cs#))]
+  (let [pm `(fn [p# f# & cs#] (apply pmap-buffer p# ~buffer f# cs#))]
     (impl/pfor-internal pool bindings body pm)))
 
 (defmacro upfor
@@ -191,10 +231,12 @@
   [pool bindings & body]
   (impl/pfor-internal pool bindings body `upmap))
 
-(defmacro upfor-manual
+(defmacro upfor-buffer
+  "Like upfor, but it takes a buffer size; see pmap-buffer for information
+  about this argument."
   [pool buffer bindings & body]
   ;; Instead of pmap, we'll use an inline function with the buffer thrown in
   ;; there. It's hacky, because it relies on exactly how pfor-internal expands,
   ;; but it works.
-  (let [upm `(fn [p# f# & cs#] (apply upmap-manual p# ~buffer f# cs#))]
+  (let [upm `(fn [p# f# & cs#] (apply upmap-buffer p# ~buffer f# cs#))]
     (impl/pfor-internal pool bindings body upm)))
