@@ -15,19 +15,92 @@
   (:require
     [clojure.test :refer :all]
     [com.climate.claypoole :as cp]
+    [com.climate.claypoole.impl :as impl]
     [com.climate.claypoole.lazy :as lazy]
     [com.climate.claypoole-test :as cptest]))
 
 
-;; TODO add tests for laziness
+(defn check-input-laziness
+  "Check that a function is actually lazy in reading its input."
+  [pmap-like]
+  (let [started (atom #{})
+        readahead 10
+        input (->> (* 3 readahead)
+                   range
+                   impl/unchunk
+                   (map #(do (swap! started conj %) %)))]
+    (doall (take 2 (pmap-like readahead inc input)))
+    (Thread/sleep 10)
+    ;; Exactly what we asked for, plus readahead, is realized.
+    (is (= (+ 2 readahead) (count @started)))))
 
-(def check-all cptest/check-all)
+(defn check-output-laziness
+  "Check that a function is actually lazy in computing its output."
+  [pmap-like]
+  (let [started (atom #{})
+        readahead 10
+        input (range (* 3 readahead))]
+    (doall (take 2 (pmap-like readahead #(do (swap! started conj %) %) input)))
+    (Thread/sleep 10)
+    ;; Exactly what we asked for, plus readahead, is realized.
+    (is (= (+ 2 readahead) (count @started)))))
+
+(defn check-all
+  [fn-name pmap-like ordered? streaming?]
+  ;; Apply all the standard tests
+  (cptest/check-all fn-name pmap-like ordered? streaming? true)
+  (when streaming?
+    (testing (format "%s is lazy in its input" fn-name)
+    (check-input-laziness pmap-like)))
+  (testing (format "%s is lazy in its output" fn-name)
+    (check-output-laziness pmap-like)))
+
+(defn check-input-controllable-readahead
+  "Check that the manual pmap function's readahead for the input obeys the
+  parameter."
+  [manual-pmap-like]
+  (let [started (atom #{})
+        readahead 10
+        input (->> (* 3 readahead)
+                   range
+                   impl/unchunk
+                   (map #(do (swap! started conj %) %)))]
+    (doall (take 2 (manual-pmap-like 3 readahead inc input)))
+    (Thread/sleep 10)
+    ;; Exactly what we asked for, plus readahead, is realized.
+    (is (= (+ 2 readahead) (count @started)))))
+
+(defn check-output-controllable-readahead
+  "Check that the manual pmap function's readahead for the output obeys the
+  parameter."
+  [manual-pmap-like]
+  (let [started (atom #{})
+        readahead 10
+        input (range (* 3 readahead))]
+    (doall (take 2 (manual-pmap-like 3 readahead #(do (swap! started conj %) %) input)))
+    (Thread/sleep 10)
+    ;; Exactly what we asked for, plus readahead, is realized.
+    (is (= (+ 2 readahead) (count @started)))))
+
+(defn check-all-manual
+  [fn-name manual-pmap-like ordered? streaming?]
+  (check-all fn-name (fn [p f i] (manual-pmap-like p 10 f i))
+             ordered? streaming?)
+  (when streaming?
+    (check-output-controllable-readahead manual-pmap-like))
+  (check-output-controllable-readahead manual-pmap-like))
 
 (deftest test-pmap
-  (check-all "pmap" lazy/pmap true true true))
+  (check-all "pmap" lazy/pmap true true))
+
+(deftest test-pmap-manual
+  (check-all-manual "pmap-manual" lazy/pmap-manual true true))
 
 (deftest test-upmap
-  (check-all "upmap" lazy/upmap false true true))
+  (check-all "upmap" lazy/upmap false true))
+
+(deftest test-upmap-manual
+  (check-all-manual "upmap-manual" lazy/upmap-manual false true))
 
 (deftest test-pcalls
   (testing "basic pcalls test"
@@ -39,7 +112,16 @@
               pool
               (for [i input]
                 #(work i))))]
-    (check-all "pcalls" pmap-like true true true)))
+    (check-all "pcalls" pmap-like true true)))
+
+(deftest test-pcalls-manual
+  (letfn [(pmap-like [pool buffer work input]
+            (apply
+              lazy/pcalls-manual
+              pool buffer
+              (for [i input]
+                #(work i))))]
+    (check-all-manual "pcalls-manual" pmap-like true true)))
 
 (deftest test-upcalls
   (testing "basic pcalls test"
@@ -51,7 +133,16 @@
               pool
               (for [i input]
                 #(work i))))]
-    (check-all "upcalls" pmap-like false true true)))
+    (check-all "upcalls" pmap-like false true)))
+
+(deftest test-upcalls-manual
+  (letfn [(pmap-like [pool buffer work input]
+            (apply
+              lazy/upcalls-manual
+              pool buffer
+              (for [i input]
+                #(work i))))]
+    (check-all-manual "upcalls-manual" pmap-like false true)))
 
 (deftest test-pvalues
   (testing "basic pvalues test"
@@ -66,7 +157,19 @@
                       ~@(for [i input]
                           (list worksym i)))))
                  pool work)))]
-    (check-all "pvalues" pmap-like true false true)))
+    (check-all "pvalues" pmap-like true false)))
+
+(deftest test-pvalues-manual
+  (letfn [(pmap-like [pool buffer work input]
+            (let [worksym (gensym "work")]
+              ((eval
+                 `(fn [pool# buffer# ~worksym]
+                    (lazy/pvalues-manual
+                      pool# buffer#
+                      ~@(for [i input]
+                          (list worksym i)))))
+                 pool buffer work)))]
+    (check-all-manual "pvalues-manual" pmap-like true false)))
 
 (deftest test-upvalues
   (testing "basic upvalues test"
@@ -81,7 +184,19 @@
                       ~@(for [i input]
                           (list worksym i)))))
                  pool work)))]
-    (check-all "upvalues" pmap-like false false true)))
+    (check-all "upvalues" pmap-like false false)))
+
+(deftest test-upvalues-manual
+  (letfn [(pmap-like [pool buffer work input]
+            (let [worksym (gensym "work")]
+              ((eval
+                 `(fn [pool# buffer# ~worksym]
+                    (lazy/upvalues-manual
+                      pool# buffer#
+                      ~@(for [i input]
+                          (list worksym i)))))
+                 pool buffer work)))]
+    (check-all-manual "upvalues-manual" pmap-like false false)))
 
 (deftest test-pfor
   (testing "basic pfor test"
@@ -92,7 +207,15 @@
               pool
               [i input]
               (work i)))]
-    (check-all "pfor" pmap-like true true true)))
+    (check-all "pfor" pmap-like true true)))
+
+(deftest test-pfor-manual
+  (letfn [(pmap-like [pool buffer work input]
+            (lazy/pfor-manual
+              pool buffer
+              [i input]
+              (work i)))]
+    (check-all-manual "pfor-manual" pmap-like true true)))
 
 (deftest test-upfor
   (testing "basic upfor test"
@@ -103,4 +226,12 @@
               pool
               [i input]
               (work i)))]
-    (check-all "upfor" pmap-like false true true)))
+    (check-all "upfor" pmap-like false true)))
+
+(deftest test-upfor-manual
+  (letfn [(pmap-like [pool buffer work input]
+            (lazy/upfor-manual
+              pool buffer
+              [i input]
+              (work i)))]
+    (check-all-manual "upfor-manual" pmap-like false true)))

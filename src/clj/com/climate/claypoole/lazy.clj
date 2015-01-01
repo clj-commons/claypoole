@@ -124,6 +124,10 @@
   [pool & fs]
   (pmap pool #(%) fs))
 
+(defn pcalls-manual
+  [pool buffer & fs]
+  (pmap-manual pool buffer #(%) fs))
+
 (defn upcalls
   "Like clojure.core.pcalls, except it takes a threadpool and returns results
   ordered by completion time. For more detail on its parallelism and on its
@@ -131,11 +135,19 @@
   [pool & fs]
   (upmap pool #(%) fs))
 
+(defn upcalls-manual
+  [pool buffer & fs]
+  (upmap-manual pool buffer #(%) fs))
+
 (defmacro pvalues
   "Like clojure.core.pvalues, except it takes a threadpool. For more detail on
   its parallelism and on its threadpool argument, see pmap."
   [pool & exprs]
   `(pcalls ~pool ~@(for [e exprs] `(fn [] ~e))))
+
+(defmacro pvalues-manual
+  [pool buffer & exprs]
+  `(pcalls-manual ~pool ~buffer ~@(for [e exprs] `(fn [] ~e))))
 
 (defmacro upvalues
   "Like clojure.core.pvalues, except it takes a threadpool and returns results
@@ -144,7 +156,9 @@
   [pool & exprs]
   `(upcalls ~pool ~@(for [e exprs] `(fn [] ~e))))
 
-;; TODO add pfor-manual upfor-manual?
+(defmacro upvalues-manual
+  [pool buffer & exprs]
+  `(upcalls-manual ~pool ~buffer ~@(for [e exprs] `(fn [] ~e))))
 
 (defmacro pfor
   "A parallel version of for. It is like for, except it takes a threadpool and
@@ -166,8 +180,24 @@
   [pool bindings & body]
   (impl/pfor-internal pool bindings body `pmap))
 
+(defmacro pfor-manual
+  [pool buffer bindings & body]
+  ;; Instead of pmap, we'll use an inline function with the buffer thrown in
+  ;; there. It's hacky, because it relies on exactly how pfor-internal expands,
+  ;; but it works.
+  (let [pm `(fn [p# f# & cs#] (apply pmap-manual p# ~buffer f# cs#))]
+    (impl/pfor-internal pool bindings body pm)))
+
 (defmacro upfor
   "Like pfor, except the return value is a sequence of results ordered by
   *completion time*, not by input order."
   [pool bindings & body]
   (impl/pfor-internal pool bindings body `upmap))
+
+(defmacro upfor-manual
+  [pool buffer bindings & body]
+  ;; Instead of pmap, we'll use an inline function with the buffer thrown in
+  ;; there. It's hacky, because it relies on exactly how pfor-internal expands,
+  ;; but it works.
+  (let [upm `(fn [p# f# & cs#] (apply upmap-manual p# ~buffer f# cs#))]
+    (impl/pfor-internal pool bindings body upm)))
