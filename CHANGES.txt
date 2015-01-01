@@ -1,5 +1,9 @@
 CHANGES
 
+0.4.0
+
+- Added lazy functions in com.climate.claypoole.lazy
+
 0.3.3
 
 - Fixed memory leak / overeager pushing of tasks into the queue

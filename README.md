@@ -31,9 +31,10 @@ several ways:
   be tunable for non-CPU-bound tasks like network requests.
 * We should be able to share a threadpool between multiple `pmap`s to control
   the amount of simultaneous work we're doing.
-* We would like it to be streaming rather than lazy, so we can start it going
-  and expect it to work in the background without explicitly consuming the
-  results.
+* We would like it to be eagerly streaming rather than lazy, so we can start it
+  going and expect it to work in the background without explicitly consuming
+  the results. *As of Claypoole 0.4.0, it provides lazy maps in
+  `com.climate.claypoole.lazy`. See the section [Lazy](#lazy) below.*
 * We would like to be able to do an unordered `pmap`, so that we can start
   handling the first response as fast as possible.
 
@@ -57,6 +58,9 @@ uncompleted work.
 Note that these functions are eager! That's on purpose--we like to be able to
 start work going and know it'll get done. But if you try to `pmap` over
 `(range)`, you're going to have a bad time.
+
+*As of Claypoole 0.4.0, it provides lazy functions in
+`com.climate.claypoole.lazy`. See the section [Lazy](#lazy) below.*
 
 ```clojure
 (require '[com.climate.claypoole :as cp])
@@ -221,6 +225,33 @@ like so:
     ;; This is in series; we block until all work is complete!
     (cp/pmap pool myfn inputs)))
 ```
+
+## <a name="lazy">Lazy</a>
+
+As of Claypoole 0.4.0, there is a namespace `com.climate.claypoole.lazy` that
+contains lazy versions of all the parallel functions. These lazy versions do
+not compute work until forced by something like `(doall)`, just like core `map`
+and `pmap`.
+
+Like core `pmap`, they will only run the outputs you realize, plus a few more
+(a buffer). The buffer is used to help keep the threadpool busy. Each parallel
+function also comes with a -buffer variant that allows you to specify the
+buffer size. The non -buffer forms use the threadpool size as their buffer
+size.
+
+The disadvantage of the lazy functions is that they may not keep the threadpool
+as busy. For instance, this pmap will take 6 milliseconds to run:
+
+```clojure
+(lazy/pmap 2 #(Thread/sleep %) [4 3 2 1])
+```
+
+That's because it will not realize the 2 task until the 4 task is complete, so
+one thread in the pool will sit idle for 1 millisecond.
+
+To use the threadpool most efficiently with these lazy functions, prefer the
+unordered versions (e.g. `upmap`), since the ordered ones may starve the
+threadpool of work.
 
 ## How can I prioritize my tasks?
 
