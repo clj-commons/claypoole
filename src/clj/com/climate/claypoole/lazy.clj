@@ -115,9 +115,6 @@
   [pool f & colls]
   (apply upmap-manual pool (impl/get-pool-size pool) f colls))
 
-;; TODO move the following definitions to a macro? But a macro-defining-macro
-;; is a bit ugly
-
 (defn pcalls
   "Like clojure.core.pcalls, except it takes a threadpool. For more detail on
   its parallelism and on its threadpool argument, see pmap."

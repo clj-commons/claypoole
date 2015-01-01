@@ -51,7 +51,7 @@
   (cptest/check-all fn-name pmap-like ordered? streaming? true)
   (when streaming?
     (testing (format "%s is lazy in its input" fn-name)
-    (check-input-laziness pmap-like)))
+      (check-input-laziness pmap-like)))
   (testing (format "%s is lazy in its output" fn-name)
     (check-output-laziness pmap-like)))
 
@@ -87,8 +87,10 @@
   (check-all fn-name (fn [p f i] (manual-pmap-like p 10 f i))
              ordered? streaming?)
   (when streaming?
-    (check-output-controllable-readahead manual-pmap-like))
-  (check-output-controllable-readahead manual-pmap-like))
+    (testing (format "%s is lazy in its input" fn-name)
+      (check-input-controllable-readahead manual-pmap-like)))
+  (testing (format "%s is lazy in its output" fn-name)
+    (check-output-controllable-readahead manual-pmap-like)))
 
 (deftest test-pmap
   (check-all "pmap" lazy/pmap true true))
