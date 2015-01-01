@@ -218,7 +218,7 @@
              (when (threadpool? ~pool-sym)
                (shutdown! ~pool-sym))))))))
 
-(defn- serial?
+(defn serial?
   "Check if we should run this computation in serial."
   [pool]
   (or (not *parallel*) (= pool :serial)))

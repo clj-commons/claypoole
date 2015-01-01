@@ -44,23 +44,25 @@
   instead, you must specify how many tasks ahead will be run in the
   background."
   [pool buffer-size f & colls]
-  (let [[shutdown? pool] (impl/->threadpool pool)]
-    (->> colls
-         ;; use map to take care of argument alignment
-         (apply map vector)
-         ;; make sure we're not chunking
-         impl/unchunk
-         ;; make futures
-         (map (fn [a] (cp/future-call pool
-                                      ;; Use with-meta for priority
-                                      ;; threadpools
-                                      (with-meta #(apply f a)
-                                                 {:args a}))))
-         ;; force buffer-size futures to start work in the pool
-         (forceahead (or buffer-size (impl/get-pool-size pool) 0))
-         ;; read the results from the futures
-         (map deref)
-         (pool-closer shutdown? pool))))
+  (if (cp/serial? pool)
+    (apply map f colls)
+    (let [[shutdown? pool] (impl/->threadpool pool)]
+      (->> colls
+           ;; use map to take care of argument alignment
+           (apply map vector)
+           ;; make sure we're not chunking
+           impl/unchunk
+           ;; make futures
+           (map (fn [a] (cp/future-call pool
+                                        ;; Use with-meta for priority
+                                        ;; threadpools
+                                        (with-meta #(apply f a)
+                                                   {:args a}))))
+           ;; force buffer-size futures to start work in the pool
+           (forceahead (or buffer-size (impl/get-pool-size pool) 0))
+           ;; read the results from the futures
+           (map deref)
+           (pool-closer shutdown? pool)))))
 
 (defn pmap
   "A lazy pmap where the work happens in a threadpool, just like core pmap, but
@@ -78,30 +80,32 @@
   + 2; instead, you must specify how many tasks ahead will be run in the
   background."
   [pool buffer-size f & colls]
-  (let [[shutdown? pool] (impl/->threadpool pool)
-        buffer-size (or buffer-size (impl/get-pool-size pool) 0)
-        result-q (LinkedBlockingQueue. (int buffer-size))
-        run-one (fn [a]
-                  (let [p (promise)]
-                    @(deliver p
-                              (cp/future-call
-                                pool
-                                ;; Use with-meta for priority threadpools
-                                (with-meta #(try (apply f a)
-                                                 (finally (.put result-q @p)))
-                                           {:args a})))))]
-    (->> colls
-         ;; use map to take care of argument alignment
-         (apply map vector)
-         ;; make sure we're not chunking
-         impl/unchunk
-         ;; make futures
-         (map run-one)
-         ;; force buffer-size futures to start work in the pool
-         (forceahead buffer-size)
-         ;; read the results from the futures in the queue
-         (map (fn [_] (deref (.take result-q))))
-         (pool-closer shutdown? pool))))
+  (if (cp/serial? pool)
+    (apply map f colls)
+    (let [[shutdown? pool] (impl/->threadpool pool)
+          buffer-size (or buffer-size (impl/get-pool-size pool) 10)
+          result-q (LinkedBlockingQueue. (int buffer-size))
+          run-one (fn [a]
+                    (let [p (promise)]
+                      @(deliver p
+                                (cp/future-call
+                                  pool
+                                  ;; Use with-meta for priority threadpools
+                                  (with-meta #(try (apply f a)
+                                                   (finally (.put result-q @p)))
+                                             {:args a})))))]
+      (->> colls
+           ;; use map to take care of argument alignment
+           (apply map vector)
+           ;; make sure we're not chunking
+           impl/unchunk
+           ;; make futures
+           (map run-one)
+           ;; force buffer-size futures to start work in the pool
+           (forceahead buffer-size)
+           ;; read the results from the futures in the queue
+           (map (fn [_] (deref (.take result-q))))
+           (pool-closer shutdown? pool)))))
 
 (defn upmap
   "Like pmap, but with results returned in the order they completed.

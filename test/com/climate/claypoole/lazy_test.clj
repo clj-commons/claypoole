@@ -21,7 +21,86 @@
 
 ;; TODO add tests for laziness
 
+(def check-all cptest/check-all)
+
 (deftest test-pmap
-  (cptest/check-all "pmap" lazy/pmap true true true)
-  (testing "pmap reads lazily"
-    (cptest/check-lazy-read lazy/pmap true)))
+  (check-all "pmap" lazy/pmap true true true))
+
+(deftest test-upmap
+  (check-all "upmap" lazy/upmap false true true))
+
+(deftest test-pcalls
+  (testing "basic pcalls test"
+    (is (= [1 2 3 4]
+           (lazy/pcalls 3 #(inc 0) #(inc 1) #(inc 2) #(inc 3)))))
+  (letfn [(pmap-like [pool work input]
+            (apply
+              lazy/pcalls
+              pool
+              (for [i input]
+                #(work i))))]
+    (check-all "pcalls" pmap-like true true true)))
+
+(deftest test-upcalls
+  (testing "basic pcalls test"
+    (is (= [1 2 3 4]
+             (sort (lazy/upcalls 3 #(inc 0) #(inc 1) #(inc 2) #(inc 3))))))
+  (letfn [(pmap-like [pool work input]
+            (apply
+              lazy/upcalls
+              pool
+              (for [i input]
+                #(work i))))]
+    (check-all "upcalls" pmap-like false true true)))
+
+(deftest test-pvalues
+  (testing "basic pvalues test"
+    (is (= [1 2 3 4]
+           (lazy/pvalues 3 (inc 0) (inc 1) (inc 2) (inc 3)))))
+  (letfn [(pmap-like [pool work input]
+            (let [worksym (gensym "work")]
+              ((eval
+                 `(fn [pool# ~worksym]
+                    (lazy/pvalues
+                      pool#
+                      ~@(for [i input]
+                          (list worksym i)))))
+                 pool work)))]
+    (check-all "pvalues" pmap-like true false true)))
+
+(deftest test-upvalues
+  (testing "basic upvalues test"
+    (is (= [1 2 3 4]
+           (sort (lazy/upvalues 3 (inc 0) (inc 1) (inc 2) (inc 3))))))
+  (letfn [(pmap-like [pool work input]
+            (let [worksym (gensym "work")]
+              ((eval
+                 `(fn [pool# ~worksym]
+                    (lazy/upvalues
+                      pool#
+                      ~@(for [i input]
+                          (list worksym i)))))
+                 pool work)))]
+    (check-all "upvalues" pmap-like false false true)))
+
+(deftest test-pfor
+  (testing "basic pfor test"
+    (is (= (range 1 11)
+           (lazy/pfor 3 [i (range 10)] (inc i)))))
+  (letfn [(pmap-like [pool work input]
+            (lazy/pfor
+              pool
+              [i input]
+              (work i)))]
+    (check-all "pfor" pmap-like true true true)))
+
+(deftest test-upfor
+  (testing "basic upfor test"
+    (is (= (range 1 11)
+           (sort (lazy/pfor 3 [i (range 10)] (inc i))))))
+  (letfn [(pmap-like [pool work input]
+            (lazy/upfor
+              pool
+              [i input]
+              (work i)))]
+    (check-all "upfor" pmap-like false true true)))
