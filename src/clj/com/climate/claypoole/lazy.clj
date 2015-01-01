@@ -70,10 +70,10 @@
     (apply map f colls)
     (let [[shutdown? pool] (impl/->threadpool pool)]
       (->> colls
+           ;; make sure we're not chunking
+           (map impl/unchunk)
            ;; use map to take care of argument alignment
            (apply map vector)
-           ;; make sure we're not chunking
-           impl/unchunk
            ;; make futures
            (map (fn [a] (cp/future-call pool
                                         ;; Use with-meta for priority
@@ -122,10 +122,10 @@
                                                    (finally (.put result-q @p)))
                                              {:args a})))))]
       (->> colls
+           ;; make sure we're not chunking
+           (map impl/unchunk)
            ;; use map to take care of argument alignment
            (apply map vector)
-           ;; make sure we're not chunking
-           impl/unchunk
            ;; make futures
            (map run-one)
            ;; force buffer-size futures to start work in the pool
