@@ -46,12 +46,19 @@
   "Given a sequence, concat onto its end a lazy sequence that will shutdown a
   pool when forced."
   [shutdown? pool s]
-  (concat s
-          ;; Shutdown the pool if needed.
-          (lazy-seq
-            (do
-              (when shutdown? (cp/shutdown pool))
-              nil))))
+  (if-not shutdown?
+    s
+    (letfn [(closer [s]
+              (lazy-seq
+                (try
+                  (if (seq s)
+                    (cons (first s) (closer (rest s)))
+
+                    (do (cp/shutdown pool) nil))
+                  (catch Throwable t
+                    (cp/shutdown pool)
+                    (throw t)))))]
+      (closer s))))
 
 (defn pmap-buffer
   "A lazy pmap where the work happens in a threadpool, just like core pmap, but

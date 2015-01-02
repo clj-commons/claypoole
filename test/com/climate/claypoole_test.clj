@@ -471,6 +471,7 @@
         pool (cp/threadpool n)
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
+          ;; TODO throw the original exception!
           ExecutionException #"keyword found"
           (dorun (pmap-like pool
                             (fn [i]
@@ -547,22 +548,24 @@
                                       (let [[s? p] (real->threadpool arg)]
                                         (reset! apool p)
                                         [s? p]))]
-      (doseq [[is-pool? should-be-shutdown? arg should-we-shutdown?]
-              [[true false (cp/threadpool n) true]
-               [true true n false]
-               [true false :builtin false]
-               [false false :serial false]]]
+      (doseq [[is-pool? should-be-shutdown? arg inputs should-we-shutdown?]
+              [[true false (cp/threadpool n) (range (* 2 n)) true]
+               [true true n (range (* 2 n)) false]
+               [true false :builtin (range (* 2 n)) false]
+               [false false :serial (range (* 2 n)) false]]]
         (let [inputs (range (* n 2))
               ;; Use a real future to avoid blocking on :serial.
               results (future (pmap-like arg inc inputs))]
           ;; Check the results
           (is (= (map inc inputs) (sort @results)))
-          ;; Wait for the thread to be shutdown.
-          (Thread/sleep 100)
           (when should-be-shutdown?
             (is (true? (cp/shutdown? @apool))))
           (when should-we-shutdown?
-            (cp/shutdown! @apool)))))))
+            (cp/shutdown! @apool))))
+      ;; Shut down even if an exception is thrown
+      (is (thrown? Exception
+                   (doall (pmap-like 2 inc [1 2 nil]))))
+      (is (true? (cp/shutdown? @apool))))))
 
 ;; A simple object to call a function at finalize.
 (deftype Finalizer [f]
