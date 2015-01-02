@@ -234,32 +234,57 @@ not compute work until forced by something like `(doall)`, just like core `map`
 and `pmap`.
 
 Like core `pmap`, they will only run the outputs you realize, plus a few more
-(a buffer). The buffer is used to help keep the threadpool busy. Each parallel
-function also comes with a -buffer variant that allows you to specify the
-buffer size. The non -buffer forms use the threadpool size as their buffer
-size.
+(a buffer). The buffer is used to help keep the threadpool busy. Unlike core
+`pmap`, the buffer size is not fixed at `ncpus + 2`; instead, it defaults to
+the size of the threadpool to keep the pool full. Each parallel function also
+comes with a -buffer variant that has an extra argument, allowing you to
+specify the buffer size.
 
 For instance, these will both cause 10 items to be realized:
 
 ```clojure
+(require '[com.climate.claypoole :as cp])
+(require '[com.climate.claypoole.lazy :as lazy])
 (cp/with-shutdown! [pool 2]
   (doall (take 8 (lazy/pmap pool inc (range))))
   (doall (take 4 (lazy/pmap-buffer pool 6 inc (range)))))
 ```
 
+### Lazy Advantages
+
+The lazy functions work well with sequences too large to fit in memory.
+Furthermore, the lazy functions work well with chained maps that operate at
+different speeds over large amounts of data. If an eager map that runs quickly
+feeds into an eager map that runs slowly, the buffer between them will tend to
+grow, possibly running the system out of memory. Lazy functions will avoid this
+by only performing work as needed.
+
+As a rule of thumb, if you are working with data too large to fit into memory,
+you probably want a lazy operation.
+
+### Lazy Disadvantages
+
 The disadvantage of the lazy functions is that they may not keep the threadpool
-as busy. For instance, this pmap will take 6 milliseconds to run:
+fully busy. For instance, this pmap will take 6 seconds to run:
 
 ```clojure
-(lazy/pmap 2 #(Thread/sleep %) [4 3 2 1])
+(doall (lazy/pmap 2 #(Thread/sleep (* % 1000)) [4 3 2 1]))
 ```
 
 That's because it will not realize the 2 task until the 4 task is complete, so
-one thread in the pool will sit idle for 1 millisecond.
+one thread in the pool will sit idle for 1 second. On the other hand, an eager
+function would only take 5 seconds, since the two threads would be assigned
+tasks as follows:
 
-To use the threadpool most efficiently with these lazy functions, prefer the
-unordered versions (e.g. `upmap`), since the ordered ones may starve the
-threadpool of work.
+4: Thread 0
+3: Thread 1
+2: Thread 1
+1: Thread 0
+
+Note also that an unordered map (`upmap`) would also take 5 seconds here, since
+as soon as 3 is complete, it would be returned and the next item would be
+forced. In general, to use the threadpool most efficiently with these lazy
+functions, prefer the unordered versions.
 
 ## How can I prioritize my tasks?
 
