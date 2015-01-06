@@ -6,6 +6,7 @@ functions such as `pmap`, `future`, and `for`.
 Claypoole is available in the Clojars repository. Just use this leiningen
 dependency:
 [![Clojars Project](http://clojars.org/com.climate/claypoole/latest-version.svg)](http://clojars.org/com.climate/claypoole)
+[![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/claypoole/status.svg)](http://jarkeeper.com/TheClimateCorporation/claypoole)
 
 ## Why do you use claypoole?
 

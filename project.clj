@@ -23,4 +23,4 @@
   :java-source-paths ["src/java"]
   :pedantic? :warn
   :dependencies [[org.clojure/clojure "1.6.0"]]
-  :plugins [[jonase/eastwood "0.1.4"]])
+  :plugins [[jonase/eastwood "0.2.1"]])
