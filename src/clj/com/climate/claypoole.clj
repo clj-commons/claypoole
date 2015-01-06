@@ -364,7 +364,7 @@
                      (when shutdown? (shutdown pool)))))]
     (deliver canceller (make-canceller driver))
     ;; Read results as available.
-    (concat (map deref
+    (concat (map impl/deref-fixing-exceptions
                  (if ordered?
                    tasks
                    (map second (impl/lazy-co-read tasks unordered-results))))

@@ -89,7 +89,7 @@
            ;; force buffer-size futures to start work in the pool
            (forceahead (or buffer-size (impl/get-pool-size pool) 0))
            ;; read the results from the futures
-           (map deref)
+           (map impl/deref-fixing-exceptions)
            (seq-open #(when shutdown? (cp/shutdown pool)))))))
 
 (defn pmap
@@ -137,7 +137,7 @@
            ;; force buffer-size futures to start work in the pool
            (forceahead buffer-size)
            ;; read the results from the futures in the queue
-           (map (fn [_] (deref (.take result-q))))
+           (map (fn [_] (impl/deref-fixing-exceptions (.take result-q))))
            (seq-open #(if shutdown? (cp/shutdown pool)))))))
 
 (defn upmap

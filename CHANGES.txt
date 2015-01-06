@@ -3,6 +3,8 @@ CHANGES
 0.4.0
 
 - Added lazy functions in com.climate.claypoole.lazy
+- Changed pmap functions to throw the original exception, not a
+  java.util.concurrent.ExecutionException
 
 0.3.3
 

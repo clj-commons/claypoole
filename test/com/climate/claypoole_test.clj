@@ -454,11 +454,11 @@
         pool (cp/threadpool n)
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
-          ExecutionException #"keyword found"
+          NullPointerException #"keyword found"
           (dorun (pmap-like pool
                             (fn [i]
                               (if (keyword? i)
-                                (throw (Exception. "keyword found"))
+                                (throw (NullPointerException. "keyword found"))
                                 i))
                             inputs))))
     (.shutdown pool)))
@@ -471,9 +471,8 @@
         pool (cp/threadpool n)
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
-          ;; TODO throw the original exception!
-          ExecutionException #"keyword found"
-          (dorun (pmap-like pool
+          AssertionError #"keyword found"
+          (doall (pmap-like pool
                             (fn [i]
                               (if (keyword? i)
                                 (throw (AssertionError. "keyword found"))
@@ -738,7 +737,7 @@
     (is (= 2 @(cp/future :builtin (inc 1))))
     (is (= 2 @(cp/future :serial (inc 1)))))
   (letfn [(pmap-like [pool work input]
-            (map deref
+            (map impl/deref-fixing-exceptions
                  (doall
                    (for [i input]
                      (cp/future pool (work i))))))]
