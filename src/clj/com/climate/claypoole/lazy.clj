@@ -42,23 +42,21 @@
        s
        (concat (drop buffer-size s) (repeat nil))))
 
-(defn- pool-closer
-  "Given a sequence, concat onto its end a lazy sequence that will shutdown a
-  pool when forced."
-  [shutdown? pool s]
-  (if-not shutdown?
-    s
-    (letfn [(closer [s]
-              (lazy-seq
-                (try
-                  (if (seq s)
-                    (cons (first s) (closer (rest s)))
-
-                    (do (cp/shutdown pool) nil))
-                  (catch Throwable t
-                    (cp/shutdown pool)
-                    (throw t)))))]
-      (closer s))))
+(defn- seq-open
+  "Converts a seq s into a lazy seq that calls a function f when the seq is
+  fully realized or when an exception is thrown. Sort of like with-open, but
+  not a macro, not necessarily calling .close, and for a lazy seq."
+  [f s]
+  (lazy-seq
+    (let [sprime (try
+                   ;; force one element of s to make exceptions happen here
+                   (when (seq s) (cons (first s) (rest s)))
+                   (catch Throwable t
+                     (f)
+                     (throw t)))]
+      (if (seq sprime)
+        (cons (first sprime) (seq-open f (rest sprime)))
+        (do (f) nil)))))
 
 (defn pmap-buffer
   "A lazy pmap where the work happens in a threadpool, just like core pmap, but
@@ -91,7 +89,7 @@
            (forceahead (or buffer-size (impl/get-pool-size pool) 0))
            ;; read the results from the futures
            (map deref)
-           (pool-closer shutdown? pool)))))
+           (seq-open #(when shutdown? (cp/shutdown pool)))))))
 
 (defn pmap
   "A lazy pmap where the work happens in a threadpool, just like core pmap, but
@@ -139,7 +137,7 @@
            (forceahead buffer-size)
            ;; read the results from the futures in the queue
            (map (fn [_] (deref (.take result-q))))
-           (pool-closer shutdown? pool)))))
+           (seq-open #(if shutdown? (cp/shutdown pool)))))))
 
 (defn upmap
   "Like pmap, but with results returned in the order they completed.
