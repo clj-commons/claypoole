@@ -56,6 +56,23 @@
      (catch TimeoutException e
        timeout-val))))
 
+(defn deref-fixing-exceptions
+  "If a future experiences an exception and you dereference the future, you
+  will see not the original exception but a
+  java.util.concurrent.ExecutionException. That's sometimes not the result you
+  want. This catches those exceptions and re-throws the future's exception,
+  which can be much less surprising to downstream code."
+  [fut]
+  (try (deref fut)
+    (catch java.util.concurrent.ExecutionException e
+      (let [cause (.getCause e)]
+        ;; Update the stack trace to include e
+        (.setStackTrace cause (into-array StackTraceElement
+                                          (concat
+                                            (.getStackTrace cause)
+                                            (.getStackTrace e))))
+        (throw cause)))))
+
 (defn dummy-future-call
   "A dummy future-call that runs in serial and returns a future containing the
   result."
