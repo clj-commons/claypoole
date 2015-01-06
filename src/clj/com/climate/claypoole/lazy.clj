@@ -50,7 +50,8 @@
   (lazy-seq
     (let [sprime (try
                    ;; force one element of s to make exceptions happen here
-                   (when (seq s) (cons (first s) (rest s)))
+                   (when-let [s (seq s)]
+                     (cons (first s) (rest s)))
                    (catch Throwable t
                      (f)
                      (throw t)))]
