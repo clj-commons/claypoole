@@ -336,17 +336,16 @@
                            :while (not @abort)]
                      (impl/queue-seq-add! task-q (start-task i a)))
                    (finally
-                     (impl/queue-seq-end! task-q))))
+                     (impl/queue-seq-end! task-q)
+                     (when shutdown? (shutdown pool)))))
         result-seq (if ordered?
                      tasks
                      (map second (impl/lazy-co-read tasks unordered-results)))]
     ;; Read results as available.
-    (impl/seq-open
-      #(when shutdown? (shutdown pool))
-      (concat
-        (map impl/deref-fixing-exceptions result-seq)
-        ;; Deref the read-future to get its exceptions, if it has any.
-        (lazy-seq @driver)))))
+    (concat
+      (map impl/deref-fixing-exceptions result-seq)
+      ;; Deref the read-future to get its exceptions, if it has any.
+      (lazy-seq @driver))))
 
 (defn- pmap-boilerplate
   "Do boilerplate pmap checks, then call the real pmap function."
