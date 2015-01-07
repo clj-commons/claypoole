@@ -116,9 +116,9 @@
 (defn apply-map
   "Apply a function that takes keyword arguments to a map of arguments."
   [f & args]
-  (let [args (drop-last args)
+  (let [args* (drop-last args)
         arg-map (last args)]
-    (apply f (concat args (mapcat identity arg-map)))))
+    (apply f (concat args* (mapcat identity arg-map)))))
 
 (defn thread-factory
   "Create a ThreadFactory with keyword options including thread daemon status

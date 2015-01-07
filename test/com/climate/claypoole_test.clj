@@ -32,25 +32,24 @@
 
 (defn check-threadpool-options
   [pool-constructor]
-  (cp/with-shutdown! [pool (pool-constructor 4)]
-    (dotimes [_ 8] (.submit pool #(inc 1)))
-    (let [factory (.getThreadFactory pool)
-          start (promise)
-          thread (.newThread factory #(deref start))]
-      (is (true? (.isDaemon thread)))
-      (is (not (empty? (re-find #"claypoole-[0-9]*-4" (.getName thread)))))
-      (is (= (.getPriority (Thread/currentThread)) (.getPriority thread)))))
-  (cp/with-shutdown! [pool (pool-constructor 4
-                                             :daemon false
-                                             :name "fiberpond"
-                                             :thread-priority 4)]
-    (dotimes [_ 8] (.submit pool #(inc 1)))
-    (let [factory (.getThreadFactory pool)
-          start (promise)
-          thread (.newThread factory #(deref start))]
-      (is (false? (.isDaemon thread)))
-      (is (= "fiberpond-4" (.getName thread)))
-      (is (= 4 (.getPriority thread))))))
+  (let [default-priority (.getPriority (Thread/currentThread))]
+    (cp/with-shutdown! [pool (pool-constructor 4)]
+      @(cp/future
+         pool
+         (let [thread (Thread/currentThread)]
+           (is (true? (.isDaemon thread)))
+           (is (re-matches #"claypoole-[0-9]*-[0-4]" (.getName thread)))
+           (is (= default-priority (.getPriority thread))))))
+    (cp/with-shutdown! [pool (pool-constructor 4
+                                               :daemon false
+                                               :name "fiberpond"
+                                               :thread-priority 4)]
+      @(cp/future
+         pool
+         (let [thread (Thread/currentThread)]
+           (is (false? (.isDaemon thread)))
+           (is (re-matches #"fiberpond-[0-4]" (.getName thread)))
+           (is (= 4 (.getPriority thread))))))))
 
 (deftest test-threadpool
   (testing "Basic threadpool creation"
@@ -119,7 +118,7 @@
         (deref default-task)
         (is (= [:first 100 :default 1] @completed)))))
   (testing "Priority threadpool options"
-    (check-threadpool-options cp/threadpool)))
+    (check-threadpool-options cp/priority-threadpool)))
 
 (deftest test-with-priority-fn
   (testing "with-priority-fn works for simple upmap"
