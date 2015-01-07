@@ -472,7 +472,7 @@
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
           AssertionError #"keyword found"
-          (doall (pmap-like pool
+          (dorun (pmap-like pool
                             (fn [i]
                               (if (keyword? i)
                                 (throw (AssertionError. "keyword found"))
@@ -563,7 +563,7 @@
             (cp/shutdown! @apool))))
       ;; Shut down even if an exception is thrown
       (is (thrown? Exception
-                   (doall (pmap-like 2 inc [1 2 nil]))))
+                   (dorun (pmap-like 4 inc [1 2 nil]))))
       (is (true? (cp/shutdown? @apool))))))
 
 ;; A simple object to call a function at finalize.
@@ -698,9 +698,9 @@
     (testing (format "%s doesn't read ahead in the input sequence" fn-name)
       (check-read-ahead pmap-like lazy?))
     (testing (format "%s can be chained in various threadpools" fn-name)
-             (check-chaining pmap-like))
+      (check-chaining pmap-like))
     (testing (format "%s stops processing when an exception occurs" fn-name)
-             (check-shuts-off pmap-like))
+      (check-shuts-off pmap-like))
     (testing (format "%s reads lazily" fn-name)
       (check-lazy-read pmap-like lazy?))))
 

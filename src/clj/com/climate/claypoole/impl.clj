@@ -30,7 +30,6 @@
      ExecutorService
      Future
      LinkedBlockingQueue
-     ScheduledExecutorService
      ThreadFactory
      TimeoutException
      TimeUnit]))
@@ -156,7 +155,7 @@
   "Make a threadpool. It should be shutdown when no longer needed.
 
   See docs in com.climate.claypoole/threadpool."
-  ^ScheduledExecutorService [n & args]
+  ^java.util.concurrent.ScheduledExecutorService [n & args]
   ;; Return a ScheduledThreadPool rather than a FixedThreadPool because it's
   ;; the same thing with some bonus features.
   (Executors/newScheduledThreadPool n (apply thread-factory args)))
@@ -308,7 +307,8 @@
 
   will use pool p to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
   with priorities [6 5 4]."
-  ^PriorityThreadpool [^PriorityThreadpool pool priority-fn]
+  ^com.climate.claypoole.impl.PriorityThreadpool
+  [^PriorityThreadpool pool priority-fn]
   (let [^PriorityThreadpoolImpl pool* (.pool pool)]
     (PriorityThreadpool. pool* priority-fn)))
 

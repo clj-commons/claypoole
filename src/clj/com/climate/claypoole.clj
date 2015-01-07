@@ -127,7 +127,8 @@
 
   will use pool p to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
   with priorities [6 5 4]."
-  ^PriorityThreadpool [^PriorityThreadpool pool priority-fn]
+  ^com.climate.claypoole.impl.PriorityThreadpool
+  [^com.climate.claypoole.impl.PriorityThreadpool pool priority-fn]
   (impl/with-priority-fn pool priority-fn))
 
 (defn with-priority
@@ -147,7 +148,7 @@
     (def wp (with-priority p 1))
     (def t1 (future (with-priority (with-priority wp 2) 3) :result))
   "
-  ^ExecutorService [^ExecutorService pool priority]
+  ^java.util.concurrent.ExecutorService [^ExecutorService pool priority]
   (with-priority-fn pool (constantly priority)))
 
 (defn threadpool?

@@ -26,13 +26,13 @@
       (->> (range 10)
            (#'lazy/seq-open #(reset! a true))
            (take 5)
-           doall)
+           dorun)
       (is (false? @a))))
   (testing "seq-open calls f when s is complete"
     (let [a (atom false)]
       (->> (range 10)
            (#'lazy/seq-open #(reset! a true))
-           doall)
+           dorun)
       (is (true? @a))))
   (testing "seq-open calls f when there's an exception"
     (let [a (atom false)]
@@ -41,7 +41,7 @@
                         impl/unchunk
                         (map inc)
                         (#'lazy/seq-open #(reset! a true))
-                        doall)))
+                        dorun)))
       (is (true? @a)))))
 
 (defn check-input-laziness
@@ -53,7 +53,7 @@
                    range
                    impl/unchunk
                    (map #(do (swap! started conj %) %)))]
-    (doall (take 2 (pmap-like readahead inc input)))
+    (dorun (take 2 (pmap-like readahead inc input)))
     (Thread/sleep 10)
     ;; Exactly what we asked for, plus readahead, is realized.
     (is (= (+ 2 readahead) (count @started)))))
@@ -64,7 +64,7 @@
   (let [started (atom #{})
         readahead 10
         input (range (* 3 readahead))]
-    (doall (take 2 (pmap-like readahead #(do (swap! started conj %) %) input)))
+    (dorun (take 2 (pmap-like readahead #(do (swap! started conj %) %) input)))
     (Thread/sleep 10)
     ;; Exactly what we asked for, plus readahead, is realized.
     (is (= (+ 2 readahead) (count @started)))))
@@ -89,7 +89,7 @@
                    range
                    impl/unchunk
                    (map #(do (swap! started conj %) %)))]
-    (doall (take 2 (manual-pmap-like 3 readahead inc input)))
+    (dorun (take 2 (manual-pmap-like 3 readahead inc input)))
     (Thread/sleep 10)
     ;; Exactly what we asked for, plus readahead, is realized.
     (is (= (+ 2 readahead) (count @started)))))
@@ -101,7 +101,7 @@
   (let [started (atom #{})
         readahead 10
         input (range (* 3 readahead))]
-    (doall (take 2 (manual-pmap-like 3 readahead #(do (swap! started conj %) %) input)))
+    (dorun (take 2 (manual-pmap-like 3 readahead #(do (swap! started conj %) %) input)))
     (Thread/sleep 10)
     ;; Exactly what we asked for, plus readahead, is realized.
     (is (= (+ 2 readahead) (count @started)))))
