@@ -503,17 +503,18 @@
         inputs (range ni)
         ;; Keep track of what threads are active.
         n-active (atom 0)
+        n-seen-active (atom [])
         results (pmap-like pool
                            (fn [i]
                              (swap! n-active inc)
                              (Thread/sleep 1)
-                             ;; Make sure not too many threads are
-                             ;; going.
-                             (is (<= @n-active n))
+                             ;; Make sure not too many threads are going.
+                             (swap! n-seen-active conj @n-active)
                              (swap! n-active dec)
                              i)
                            inputs)]
-    (is (= (sort results) inputs))))
+    (is (= (sort results) inputs))
+    (is (every? #(<= % n) @n-seen-active))))
 
 (defn check-maximum-parallelism
   "Check that a pmap function doesn't exhibit excessive parallelism."
