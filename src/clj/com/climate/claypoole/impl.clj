@@ -292,12 +292,6 @@
               (cons [(first s1) (first s2)]
                     (lazy-co-read (rest s1) (rest s2))))))
 
-(defn subseqs
-  "Given a sequence s, return a lazy, non-head-holding sequence of
-  (s (drop 1 s) (drop 2 s) ... '())"
-  [s]
-  (reductions (fn [l _] (rest l)) s s))
-
 (defn with-priority-fn
   "Make a priority-threadpool wrapper that uses a given priority function.
 
@@ -333,3 +327,20 @@
                                          [(fn [priority#] ~@body)
                                           ~priority-value]))]
          (~pmap-fn-sym pool# #(%1 %2) fns# priorities#)))))
+
+(defn seq-open
+  "Converts a seq s into a lazy seq that calls a function f when the seq is
+  fully realized or when an exception is thrown. Sort of like with-open, but
+  not a macro, not necessarily calling .close, and for a lazy seq."
+  [f s]
+  (lazy-seq
+    (let [sprime (try
+                   ;; force one element of s to make exceptions happen here
+                   (when-let [s (seq s)]
+                     (cons (first s) (rest s)))
+                   (catch Throwable t
+                     (f)
+                     (throw t)))]
+      (if (seq sprime)
+        (cons (first sprime) (seq-open f (rest sprime)))
+        (do (f) nil)))))
