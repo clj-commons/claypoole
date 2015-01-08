@@ -328,21 +328,33 @@ unneeded work).
 ```clojure
 ;; Core map does no work after an exception.
 (let [counter (atom 0)]
-  (doall (map #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (try
+    (doall (map #(do (inc %) (swap! counter inc))
+           (cons nil (range 100))))
+    (catch Exception e))
   (= @counter 0))
 ;; Core pmap does ncpus + 2 work after an exception.
 (let [counter (atom 0)]
-  (doall (pmap #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (try
+    (doall (pmap #(do (inc %) (swap! counter inc))
+                 (cons nil (range 100))))
+    (catch Exception e))
   (Thread/sleep 1000)  ; wait 1 second for tasks to complete
   (= @counter (+ 2 (cp/ncpus))))
 ;; Claypoole eager pmap does pool size * 2 work after an exception.
 (let [counter (atom 0)]
-  (doall (cp/pmap 3 #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (try
+    (doall (cp/pmap 3 #(do (inc %) (swap! counter inc))
+                    (cons nil (range 100))))
+    (catch Exception e))
   (Thread/sleep 1000)  ; wait 1 second for tasks to complete
   (= @counter 6))
 ;; Claypoole lazy pmap does pool size work after an exception.
 (let [counter (atom 0)]
-  (doall (lazy/pmap 3 #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (try
+    (doall (lazy/pmap 3 #(do (inc %) (swap! counter inc))
+                      (cons nil (range 100))))
+    (catch Exception e))
   (Thread/sleep 1000)  ; wait 1 second for tasks to complete
   (= @counter 3))
 ```
