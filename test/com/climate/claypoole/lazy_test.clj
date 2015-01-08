@@ -20,30 +20,6 @@
     [com.climate.claypoole-test :as cptest]))
 
 
-(deftest test-seq-open
-  (testing "seq-open doesn't call f early"
-    (let [a (atom false)]
-      (->> (range 10)
-           (#'lazy/seq-open #(reset! a true))
-           (take 5)
-           dorun)
-      (is (false? @a))))
-  (testing "seq-open calls f when s is complete"
-    (let [a (atom false)]
-      (->> (range 10)
-           (#'lazy/seq-open #(reset! a true))
-           dorun)
-      (is (true? @a))))
-  (testing "seq-open calls f when there's an exception"
-    (let [a (atom false)]
-      (is (thrown? ClassCastException
-                   (->> [1 :x 2]
-                        impl/unchunk
-                        (map inc)
-                        (#'lazy/seq-open #(reset! a true))
-                        dorun)))
-      (is (true? @a)))))
-
 (defn check-input-laziness
   "Check that a function is actually lazy in reading its input."
   [pmap-like]

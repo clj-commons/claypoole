@@ -30,7 +30,26 @@
     (is (= (map #(list % %) (range 10))
            (impl/lazy-co-read s1 s2)))))
 
-(deftest test-subseqs
-  (let [n 10]
-    (is (= (impl/subseqs (range n))
-           (map #(drop % (range n)) (range (inc n)))))))
+(deftest test-seq-open
+  (testing "seq-open doesn't call f early"
+    (let [a (atom false)]
+      (->> (range 10)
+           (impl/seq-open #(reset! a true))
+           (take 5)
+           dorun)
+      (is (false? @a))))
+  (testing "seq-open calls f when s is complete"
+    (let [a (atom false)]
+      (->> (range 10)
+           (impl/seq-open #(reset! a true))
+           dorun)
+      (is (true? @a))))
+  (testing "seq-open calls f when there's an exception"
+    (let [a (atom false)]
+      (is (thrown? ClassCastException
+                   (->> [1 :x 2]
+                        impl/unchunk
+                        (map inc)
+                        (impl/seq-open #(reset! a true))
+                        dorun)))
+      (is (true? @a)))))

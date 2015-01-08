@@ -5,6 +5,8 @@ CHANGES
 - Added lazy functions in com.climate.claypoole.lazy
 - Changed pmap functions to throw the original exception, not a
   java.util.concurrent.ExecutionException
+- Changed how pmaps deal with exceptions; they no longer kill running tasks if
+  one task fails
 
 0.3.3
 

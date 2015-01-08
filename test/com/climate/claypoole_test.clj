@@ -537,7 +537,7 @@
 (defn check-->threadpool
   "Check that a pmap function uses ->threadpool correctly, shutting down the
   threadpool and everything."
-  [pmap-like]
+  [pmap-like lazy?]
   (is (thrown? IllegalArgumentException (pmap-like 1.5 identity [1])))
   (is (thrown? IllegalArgumentException (pmap-like :parallel identity [1])))
   (let [real->threadpool impl/->threadpool
@@ -561,10 +561,20 @@
             (is (true? (cp/shutdown? @apool))))
           (when should-we-shutdown?
             (cp/shutdown! @apool))))
-      ;; Shut down even if an exception is thrown
-      (is (thrown? Exception
-                   (dorun (pmap-like 4 inc [1 2 nil]))))
-      (is (true? (cp/shutdown? @apool))))))
+      (testing "to shut down pool if exception thrown"
+        (is (thrown? Exception
+                     (dorun (pmap-like 4 inc [1 2 nil]))))
+        ;; Wait for the pool to shut down.
+        (doseq [i (range 100)
+                :while (not (cp/shutdown? @apool))]
+          (Thread/sleep 1))
+        (is (true? (cp/shutdown? @apool))))
+      (testing "to shut down pool even without dorun"
+        (when-not lazy?
+          (let [p (promise)]
+            (pmap-like 4 #(when (= % 9) (deliver p %)) (range 10))
+            (deref p)
+            (is (true? (cp/shutdown? @apool)))))))))
 
 ;; A simple object to call a function at finalize.
 (deftype Finalizer [f]
@@ -599,7 +609,7 @@
     ;; Trigger GC
     (System/gc)
     ;; Wait for GC to run
-    (doseq [i (range 100)
+    (doseq [i (range 200)
             :while (not @a)]
       (Thread/sleep 1))
     ;; Verify that the task was GC'd
@@ -685,7 +695,7 @@
   (testing (format "%s runs n things at once" fn-name)
     (check-maximum-parallelism pmap-like))
   (testing (format "%s uses ->threadpool correctly" fn-name)
-    (check-->threadpool pmap-like))
+    (check-->threadpool pmap-like lazy?))
   (testing (format "%s is made serial by binding cp/*parallel* to false"
                    fn-name)
     (check-*parallel*-disables pmap-like))
