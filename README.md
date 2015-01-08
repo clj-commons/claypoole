@@ -278,10 +278,10 @@ one thread in the pool will sit idle for 1 second. On the other hand, an eager
 function would only take 5 seconds, since the two threads would be assigned
 tasks as follows:
 
-4: Thread 0
-3: Thread 1
-2: Thread 1
-1: Thread 0
+* 4: Thread 0
+* 3: Thread 1
+* 2: Thread 1
+* 1: Thread 0
 
 Note also that an unordered map (`upmap`) would also take 5 seconds here, since
 as soon as 3 is complete, it would be returned and the next item would be
