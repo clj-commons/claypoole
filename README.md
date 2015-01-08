@@ -330,7 +330,7 @@ unneeded work).
 (let [counter (atom 0)]
   (try
     (doall (map #(do (inc %) (swap! counter inc))
-           (cons nil (range 100))))
+                (cons nil (range 100))))
     (catch Exception e))
   (= @counter 0))
 ;; Core pmap does ncpus + 2 work after an exception.
