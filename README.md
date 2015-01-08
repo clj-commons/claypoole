@@ -326,37 +326,20 @@ functions use a buffer size equal to the pool size (so that they minimize
 unneeded work).
 
 ```clojure
-;; Core map does no work after an exception.
-(let [counter (atom 0)]
-  (try
-    (doall (map #(do (inc %) (swap! counter inc))
-                (cons nil (range 100))))
-    (catch Exception e))
-  (= @counter 0))
-;; Core pmap does ncpus + 2 work after an exception.
-(let [counter (atom 0)]
-  (try
-    (doall (pmap #(do (inc %) (swap! counter inc))
-                 (cons nil (range 100))))
-    (catch Exception e))
-  (Thread/sleep 1000)  ; wait 1 second for tasks to complete
-  (= @counter (+ 2 (cp/ncpus))))
-;; Claypoole eager pmap does pool size * 2 work after an exception.
-(let [counter (atom 0)]
-  (try
-    (doall (cp/pmap 3 #(do (inc %) (swap! counter inc))
-                    (cons nil (range 100))))
-    (catch Exception e))
-  (Thread/sleep 1000)  ; wait 1 second for tasks to complete
-  (= @counter 6))
-;; Claypoole lazy pmap does pool size work after an exception.
-(let [counter (atom 0)]
-  (try
-    (doall (lazy/pmap 3 #(do (inc %) (swap! counter inc))
-                      (cons nil (range 100))))
-    (catch Exception e))
-  (Thread/sleep 1000)  ; wait 1 second for tasks to complete
-  (= @counter 3))
+(let [slow (fn [x] (Thread/sleep 100) x)  ; we slow the work so the buffer fills
+      prn+1 (comp prn inc slow)
+      data (cons nil (iterate inc 0))]  ; we use iterate inc to avoid chunking
+  ;; Core map does no work after an exception, so no numbers will be printed.
+  (dorun (map prn+1 data))
+  ;; Core pmap does ncpus + 2 work after an exception, so on a quad-core
+  ;; computer, 6 numbers will be printed.
+  (doall (pmap prn+1 data))
+  ;; Claypoole eager pmap does pool size * 2 - 1 work after an exception, since
+  ;; the exceptional task is part of the buffer, so 5 numbers will be printed.
+  (doall (cp/pmap 3 prn+1 data))
+  ;; Claypoole lazy pmap does pool size work after an exception, so 3 numbers
+  ;; will be printed.
+  (doall (lazy/pmap 3 prn+1 data)))
 ```
 
 Note that if tasks are still running when the pool is force-shutdown with
