@@ -288,6 +288,80 @@ as soon as 3 is complete, it would be returned and the next item would be
 forced. In general, to use the threadpool most efficiently with these lazy
 functions, prefer the unordered versions.
 
+## How are exceptions handled?
+
+Exceptions are a little tricky in a `pmap` for two reasons.
+
+First, exceptions in `pmaps` are tricky because the task was run in a future,
+so Java "helpfully" rethrows the exception as a
+`java.util.concurrent.ExecutionException`. Claypoole unwraps that
+`ExecutionException` so your code only sees the original exception (as of
+Claypoole version 0.4.0). For instance:
+
+```clojure
+;; Core map throws the expected NullPointerException.
+(try
+  (first (map inc [nil]))
+  (catch NullPointerException e))
+;; Core pmap throws a java.util.concurrent.ExecutionException.
+(try
+  (first (pmap inc [nil]))
+  (catch java.util.concurrent.ExecutionException e))
+;; Claypoole pmap throws the expected NullPointerException.
+(try
+  (first (cp/pmap 2 inc [nil]))
+  (catch NullPointerException e))
+```
+
+Second, exceptions in `pmaps` are tricky because there are other tasks running,
+and it's not quite clear what to do with those. Should they be aborted? Should
+they be allowed to continue? How many should be allowed to continue?
+
+Claypoole (as of 0.4.0) works just like core `pmap`: it will not kill queued
+tasks, but it will stop adding tasks to the queue. Like core `pmap`, Claypoole's
+functions have a buffer of tasks enqueued to keep the thread pool busy. Whereas
+core `pmap` has a buffer of ncpus + 2, Claypoole's eager functions use a
+buffer size of twice the pool size (to keep the pool busy), and its lazy
+functions use a buffer size equal to the pool size (so that they minimize
+unneeded work).
+
+```clojure
+;; Core map does no work after an exception.
+(let [counter (atom 0)]
+  (doall (map #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (= @counter 0))
+;; Core pmap does ncpus + 2 work after an exception.
+(let [counter (atom 0)]
+  (doall (pmap #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (Thread/sleep 1000)  ; wait 1 second for tasks to complete
+  (= @counter (+ 2 (cp/ncpus))))
+;; Claypoole eager pmap does pool size * 2 work after an exception.
+(let [counter (atom 0)]
+  (doall (cp/pmap 3 #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (Thread/sleep 1000)  ; wait 1 second for tasks to complete
+  (= @counter 6))
+;; Claypoole lazy pmap does pool size work after an exception.
+(let [counter (atom 0)]
+  (doall (lazy/pmap 3 #(do (inc %) (swap! counter inc)) (cons nil (range 100))))
+  (Thread/sleep 1000)  ; wait 1 second for tasks to complete
+  (= @counter 3))
+```
+
+Note that if tasks are still running when the pool is force-shutdown with
+`shutdown!`, those tasks will be aborted.
+
+```clojure
+(cp/with-shutdown! [pool 2]
+  (doall (cp/pmap pool inc (cons nil (range 100)))))
+;; Some of those inc tasks will have been aborted because the sequence was
+;; truncated by the exception, so the doall finished, and then the pool was
+;; immediately shutdown! while a few tasks were still running.
+```
+
+(Note: Before Claypoole 0.4.0, its behavior was to kill later tasks if one task
+failed. In addition to possibly surprising users, that required more code
+complexity than was wise.)
+
 ## How can I prioritize my tasks?
 
 You can create a threadpool that respects task priorities by creating a
