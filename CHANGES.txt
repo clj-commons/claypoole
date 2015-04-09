@@ -1,5 +1,9 @@
 CHANGES
 
+1.0.0
+
+- No changes
+
 0.4.0
 
 - Added lazy functions in com.climate.claypoole.lazy
