@@ -11,8 +11,18 @@ dependency:
 ## Why do you use claypoole?
 
 Claypoole gives us tools to deal with common parallelism issues by letting us
-use and manage our own threadpools (a.k.a. thread pools). Our [blog posting](http://eng.climate.com/2014/02/25/claypoole-threadpool-tools-for-clojure) gives a 
-nice overview of the project and its motivations.
+use and manage our own threadpools (a.k.a. thread pools). Our [blog
+posting](http://eng.climate.com/2014/02/25/claypoole-threadpool-tools-for-clojure)
+gives a nice overview of the project and its motivations.
+
+Also, if you like learning via video, Leon gave [a talk at Clojure West
+2015](https://www.youtube.com/watch?v=BzKjIk0vgzE). It gives an intro to how
+Clojure parallelism works, including describing some of the motivations for
+Claypoole. It describes what advantages Claypoole gives and also talks about
+some of the other useful tools for Clojure parallelism (e.g.
+[core.async](https://github.com/clojure/core.async),
+[reducers](http://clojure.org/reducers), and
+[Tesser](https://github.com/aphyr/tesser)).
 
 Clojure has some nice tools for simple parallelism, but they're not a complete
 solution for doing complex things (such as controlling the level of
