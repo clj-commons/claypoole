@@ -437,3 +437,12 @@
   *completion time*, not by input order."
   [pool bindings & body]
   (impl/pfor-internal pool bindings body `upmap))
+
+(defmacro pdoseq
+  "Like doseq, but in parallel. Unlike the streaming sequence functions (e.g.
+  pmap), pdoseq blocks until all the work is done.
+
+  Similar to pfor, only the body is done in parallel. For more details, see
+  pfor."
+  [pool bindings & body]
+  `(dorun (upfor ~pool ~bindings (do ~@body))))

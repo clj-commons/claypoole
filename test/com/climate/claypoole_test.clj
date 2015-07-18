@@ -22,7 +22,8 @@
      PriorityThreadpool]
     [java.util.concurrent
      ExecutionException
-     ExecutorService]))
+     ExecutorService
+     LinkedBlockingQueue]))
 
 
 (defn callable
@@ -860,3 +861,35 @@
               [i input]
               (work i)))]
     (check-all "upfor" pmap-like false true false)))
+
+(deftest test-pdoseq
+  (testing "basic pdoseq test"
+    (cp/with-shutdown! [pool 3]
+      (let [processed (atom [])]
+        (cp/pdoseq pool [i (range 10)]
+                   (swap! processed conj i))
+        (is (= (range 10) (sort @processed))))))
+  (testing "pdoseq is parallel"
+    (let [started (atom [])
+          processed (atom [])
+          blocker (promise)
+          complete (promise)]
+      (future
+        (cp/pdoseq 3 [i (range 10)]
+                   (swap! started conj i)
+                   @blocker
+                   (swap! processed conj i))
+        (deliver complete true))
+      (Thread/sleep 10)
+      ;; Now all threads should have been started
+      (is (= (range 3) (sort @started)))
+      (is (= [] @processed))
+      ;; pdsoeq blocked, right?
+      (is (not (realized? complete)))
+      ;; Ok, tell those threads to go.
+      (deliver blocker true)
+      (is @complete)
+      (is (= (range 10) (sort @processed)))))
+  ;; We don't run the whole battery of tests because 1) it's hard to make a
+  ;; pmap-like function out of doseq, and 2) doseq is just (comp dorun upmap).
+  )
