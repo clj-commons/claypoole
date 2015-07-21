@@ -1,5 +1,9 @@
 CHANGES
 
+1.1.0 (not yet released)
+
+- Added pdoseq
+
 1.0.0
 
 - No changes

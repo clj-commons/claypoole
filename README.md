@@ -61,6 +61,7 @@ claypoole's version of one of these standard Clojure functions:
 * `pcalls`
 * `pvalues`
 * `for`
+* `doseq`
 
 Instead of lazy sequences, our functions will return eagerly streaming
 sequences. Such a sequence basically looks like `(map deref futures)` with a
