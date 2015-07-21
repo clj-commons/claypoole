@@ -23,4 +23,5 @@
   :java-source-paths ["src/java"]
   :pedantic? :warn
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.7.0"]]}}
-  :plugins [[jonase/eastwood "0.2.1"]])
+  :plugins [[jonase/eastwood "0.2.1"]
+            [lein-ancient "0.6.7"]])

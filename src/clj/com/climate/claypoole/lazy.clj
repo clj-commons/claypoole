@@ -229,3 +229,12 @@
   ;; but it works.
   (let [upm `(fn [p# f# & cs#] (apply upmap-buffer p# ~buffer f# cs#))]
     (impl/pfor-internal pool bindings body upm)))
+
+(defmacro pdoseq
+  "Like doseq, but in parallel. Unlike the streaming sequence functions (e.g.
+  pmap), pdoseq blocks until all the work is done.
+
+  Similar to pfor, only the body is done in parallel. For more details, see
+  pfor."
+  [pool bindings & body]
+  `(dorun (upfor ~pool ~bindings (do ~@body))))
