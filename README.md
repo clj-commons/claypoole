@@ -139,6 +139,13 @@ description below.
 (def moretasks (cp/pmap (cp/with-priority pool 10) myfn (range 3 10)))
 ```
 
+### Unlike the other functions, pdoseq blocks
+
+It's worth mentioning that `pdoseq` blocks. Since it doesn't create a streaming
+sequence, it doesn't happen in the "background". Instead, the calling thread
+will wait for all the tasks to complete. If you want to do work without
+blocking, use something that makes a sequence, like `upfor`.
+
 ## Do I really need to manage all those threadpools?
 
 You don't need to specifically declare a threadpool. Instead, you can just give
