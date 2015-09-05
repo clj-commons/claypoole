@@ -16,7 +16,7 @@
   :description "Claypoole: Threadpool tools for Clojure."
   :url "http://github.com/TheClimateCorporation/claypoole/"
   :license {:name "Apache License Version 2.0"
-            :url http://www.apache.org/licenses/LICENSE-2.0
+            :url "http://www.apache.org/licenses/LICENSE-2.0"
             :distribution :repo}
   :min-lein-version "2.0.0"
   :source-paths ["src/clj"]
