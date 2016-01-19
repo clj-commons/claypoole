@@ -124,8 +124,9 @@
   "Create a ThreadFactory with keyword options including thread daemon status
   :daemon, the thread name format :name (a string for format with one integer),
   and a thread priority :thread-priority."
-  ^ThreadFactory [& {:keys [daemon thread-priority] pool-name :name
-                     :or {daemon true}}]
+  ^java.util.concurrent.ThreadFactory
+  [& {:keys [daemon thread-priority] pool-name :name
+      :or {daemon true}}]
   (let [daemon* (boolean daemon)
         pool-name* (or pool-name (default-threadpool-name))
         thread-priority* (or thread-priority

@@ -108,7 +108,7 @@
 
   Otherwise, this uses the same keyword arguments as threadpool, and functions
   just like any other ExecutorService."
-  ^PriorityThreadpool
+  ^com.climate.claypoole.impl.PriorityThreadpool
   [n & {:keys [default-priority] :as args
         :or {default-priority 0}}]
   (PriorityThreadpool.
