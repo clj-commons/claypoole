@@ -62,6 +62,7 @@ claypoole's version of one of these standard Clojure functions:
 * `pvalues`
 * `for`
 * `doseq`
+* `run!`
 
 Instead of lazy sequences, our functions will return eagerly streaming
 sequences. Such a sequence basically looks like `(map deref futures)` with a
@@ -139,12 +140,13 @@ description below.
 (def moretasks (cp/pmap (cp/with-priority pool 10) myfn (range 3 10)))
 ```
 
-### Unlike the other functions, pdoseq blocks
+### Unlike the other functions, pdoseq and prun! block
 
-It's worth mentioning that `pdoseq` blocks. Since it doesn't create a streaming
-sequence, it doesn't happen in the "background". Instead, the calling thread
-will wait for all the tasks to complete. If you want to do work without
-blocking, use something that makes a sequence, like `upfor`.
+It's worth mentioning that both `pdoseq` and `prun!` block. Since they don't
+create a streaming sequence, their work doesn't happen in the "background".
+Instead, the calling thread will wait for all the tasks to complete. If you
+want to do work without blocking, use something that makes a sequence, like
+`upfor`.
 
 ## Do I really need to manage all those threadpools?
 
