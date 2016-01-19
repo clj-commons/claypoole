@@ -862,34 +862,48 @@
               (work i)))]
     (check-all "upfor" pmap-like false true false)))
 
+(defn test-parallel-do
+  [name- do-fn]
+  (deftest test-pdoseq
+    (testing (format "basic %s test" name-)
+      (cp/with-shutdown! [pool 3]
+        (let [processed (atom [])]
+          (do-fn pool #(swap! processed conj %) (range 10))
+          (is (= (range 10) (sort @processed))))))
+    (testing (format "%s is parallel" name-)
+      (let [started (atom [])
+            processed (atom [])
+            blocker (promise)
+            complete (promise)]
+        (future
+          (do-fn 3
+                 (fn [i] (swap! started conj i)
+                     @blocker
+                     (swap! processed conj i))
+                 (range 10))
+          (deliver complete true))
+        (Thread/sleep 10)
+        ;; Now all threads should have been started
+        (is (= (range 3) (sort @started)))
+        (is (= [] @processed))
+        ;; pdsoeq blocked, right?
+        (is (not (realized? complete)))
+        ;; Ok, tell those threads to go.
+        (deliver blocker true)
+        (is @complete)
+        (is (= (range 10) (sort @processed)))))
+    ;; We don't run the whole battery of tests because 1) it's hard to make a
+    ;; pmap-like function out of pdoseq, and 2) pdoseq is just (comp dorun
+    ;; upmap).
+    ))
+
 (deftest test-pdoseq
-  (testing "basic pdoseq test"
-    (cp/with-shutdown! [pool 3]
-      (let [processed (atom [])]
-        (cp/pdoseq pool [i (range 10)]
-                   (swap! processed conj i))
-        (is (= (range 10) (sort @processed))))))
-  (testing "pdoseq is parallel"
-    (let [started (atom [])
-          processed (atom [])
-          blocker (promise)
-          complete (promise)]
-      (future
-        (cp/pdoseq 3 [i (range 10)]
-                   (swap! started conj i)
-                   @blocker
-                   (swap! processed conj i))
-        (deliver complete true))
-      (Thread/sleep 10)
-      ;; Now all threads should have been started
-      (is (= (range 3) (sort @started)))
-      (is (= [] @processed))
-      ;; pdsoeq blocked, right?
-      (is (not (realized? complete)))
-      ;; Ok, tell those threads to go.
-      (deliver blocker true)
-      (is @complete)
-      (is (= (range 10) (sort @processed)))))
-  ;; We don't run the whole battery of tests because 1) it's hard to make a
-  ;; pmap-like function out of doseq, and 2) doseq is just (comp dorun upmap).
-  )
+  (test-parallel-do
+    "pdoseq"
+    (fn [pool f s]
+        (cp/pdoseq pool [i s] (f i)))))
+
+(deftest test-prun!
+  (test-parallel-do
+    "prun!"
+    (fn [pool f s] (cp/prun! pool f s))))

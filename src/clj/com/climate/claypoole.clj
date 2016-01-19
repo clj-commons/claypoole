@@ -446,3 +446,9 @@
   pfor."
   [pool bindings & body]
   `(dorun (upfor ~pool ~bindings (do ~@body))))
+
+(defn prun!
+  "Like run!, but in parallel. Unlike the streaming sequence functions (e.g.
+  pmap), prun! blocks until all the work is done."
+  [pool proc coll]
+  (dorun (upmap pool proc coll)))
