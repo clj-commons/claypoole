@@ -237,10 +237,14 @@
   Similar to pfor, only the body is done in parallel. For more details, see
   pfor."
   [pool bindings & body]
-  `(dorun (upfor ~pool ~bindings (do ~@body))))
+  ;; There's no sensible lazy version of this, so just use base claypoole's
+  ;; implementation.
+  `(cp/pdoseq ~pool ~bindings ~@body))
 
 (defn prun!
   "Like run!, but in parallel. Unlike the streaming sequence functions (e.g.
   pmap), prun! blocks until all the work is done."
   [pool proc coll]
-  (dorun (upmap pool proc coll)))
+  ;; There's no sensible lazy version of this, so just use base claypoole's
+  ;; implementation.
+  (cp/prun! pool proc coll))
