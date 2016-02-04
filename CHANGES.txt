@@ -1,5 +1,13 @@
 CHANGES
 
+1.1.2
+
+- Built with Java 1.6 again
+
+1.1.1
+
+- Added prun!
+
 1.1.0
 
 - Added pdoseq
