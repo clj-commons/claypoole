@@ -24,4 +24,6 @@
   :pedantic? :warn
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.8.0"]]}}
   :plugins [[jonase/eastwood "0.2.3"]
-            [lein-ancient "0.6.8"]])
+            [lein-ancient "0.6.8"]]
+  ;; Make sure we build for Java 1.6 for improved backwards compatibility.
+  :javac-options ["-target" "1.6" "-source" "1.6"])
