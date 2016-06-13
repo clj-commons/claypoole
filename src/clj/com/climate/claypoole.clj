@@ -12,7 +12,9 @@
 ;; and limitations under the License.
 
 (ns com.climate.claypoole
-  "Threadpool tools for Clojure.
+  "Threadpool tools for Clojure. Claypoole provides parallel functions and
+  macros that use threads from a pool and otherwise act like key builtins like
+  future, pmap, for, and so on. See the file README.md for an introduction.
 
   A threadpool is just an ExecutorService with a fixed number of threads. In
   general, you can use your own ExecutorService in place of any threadpool, and
@@ -64,8 +66,11 @@
 
   This is exposed as a public function because it's handy if you're
   instantiating your own ExecutorServices."
-  [& args]
-  (apply impl/thread-factory args))
+  [& {:keys [daemon thread-priority] pool-name :name
+      :as args}]
+  (->> args
+       (apply concat)
+       (apply impl/thread-factory)))
 
 (defn threadpool
   "Make a threadpool. It should be shutdown when no longer needed.
@@ -81,9 +86,12 @@
     :name, a string giving the pool name, which will be the prefix of each
              thread name, resulting in threads named \"name-0\",
              \"name-1\", etc. Defaults to \"claypoole-[pool-number]\".
-    :thread-priority, an integer in [Thread/MIN_PRIORITY, Thread/MAX_PRIORITY]
-             giving the priority of each thread, defaults to the priority of
-             the current thread
+    :thread-priority, an integer in [Thread/MIN_PRIORITY, Thread/MAX_PRIORITY].
+             The effects of thread priority are system-dependent and should not
+             be confused with Claypoole's priority threadpools that choose
+             tasks based on a priority. For more info about Java thread
+             priority see
+             http://www.javamex.com/tutorials/threads/priority_what.shtml
 
   Note: Returns a ScheduledExecutorService rather than just an ExecutorService
   because it's the same thing with a few bonus features."
@@ -123,9 +131,10 @@
 
   The priority function is applied to a pmap'd function's arguments. e.g.
 
-    (upmap (with-priority-fn p (fn [x _] x)) + [6 5 4] [1 2 3])
+    (upmap (with-priority-fn pool (fn [x _] x))
+           + [6 5 4] [1 2 3])
 
-  will use pool p to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
+  will use pool to run tasks [(+ 6 1) (+ 5 2) (+ 4 3)]
   with priorities [6 5 4]."
   ^com.climate.claypoole.impl.PriorityThreadpool
   [^com.climate.claypoole.impl.PriorityThreadpool pool priority-fn]
@@ -182,7 +191,8 @@
 
 (defmacro with-shutdown!
   "Lets a threadpool from an initializer, then evaluates body in a try
-  expression, forcibly shutting down the threadpool at the end.
+  expression, calling shutdown! on the threadpool to forcibly shut it down at
+  the end.
 
   The threadpool initializer may be a threadpool. Alternately, it can be any
   threadpool argument accepted by pmap, e.g. a number, :builtin, or :serial, in
@@ -220,7 +230,7 @@
                (shutdown! ~pool-sym))))))))
 
 (defn serial?
-  "Check if we should run this computation in serial."
+  "Check if we should run computations on this threadpool in serial."
   [pool]
   (or (not *parallel*) (= pool :serial)))
 
@@ -229,8 +239,9 @@
 
   The threadpool may be one of 3 things:
     1. An ExecutorService, e.g. one created by threadpool.
-    2. The keyword :default. In this case, the future will use the same
-       threadpool as an ordinary clojure.core/future.
+    2. The keyword :builtin. In this case, the future will use the built-in
+       agent threadpool, the same threadpool used by an ordinary
+       clojure.core/future.
     3. The keyword :serial. In this case, the computation will be performed in
        serial. This may be helpful during profiling, for example.
   "
@@ -269,8 +280,9 @@
 
   The threadpool may be one of 3 things:
     1. An ExecutorService, e.g. one created by threadpool.
-    2. The keyword :default. In this case, the future will use the same
-       threadpool as an ordinary clojure.core/future.
+    2. The keyword :builtin. In this case, the future will use the built-in
+       agent threadpool, the same threadpool used by an ordinary
+       clojure.core/future.
     3. The keyword :serial. In this case, the computation will be performed in
        serial. This may be helpful during profiling, for example.
   "
@@ -287,8 +299,7 @@
             unordered-results)))
 
 (defn- pmap-core
-  "Given functions to customize for pmap or upmap, create a function that does
-  the hard work of pmap."
+  "Given functions to customize for pmap or upmap, do the hard work of pmap."
   [pool ordered? f arg-seqs]
   (let [[shutdown? pool] (impl/->threadpool pool)
         ;; Use map to handle the argument sequences.
@@ -369,11 +380,11 @@
 
   The threadpool may be one of 4 things:
     1. An ExecutorService, e.g. one created by threadpool.
-    2. An integer. In case case, a threadpool will be created and destroyed
-       at the end of the function.
-    3. The keyword :cpu. In this case, a threadpool will be created with
-       ncpus + 2 threads, same parallelism as clojure.core.pmap, and it will be
-       destroyed at the end of the function.
+    2. An integer. In this case, a threadpool will be created, and it will be
+       destroyed when all the pmap tasks are complete.
+    3. The keyword :builtin. In this case, pmap will use the Clojure built-in
+       agent threadpool. For pmap, that's probably not what you want, as you'll
+       likely create a thread per task.
     4. The keyword :serial. In this case, the computations will be performed in
        serial via (doall map). This may be helpful during profiling, for example.
   "

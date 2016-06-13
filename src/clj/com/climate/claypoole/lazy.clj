@@ -44,7 +44,7 @@
 
 (defn pmap-buffer
   "A lazy pmap where the work happens in a threadpool, just like core pmap, but
-  using claypoole futures.
+  using Claypoole futures.
 
   Unlike core pmap, it doesn't assume the buffer size is nprocessors + 2;
   instead, you must specify how many tasks ahead will be run in the
@@ -77,7 +77,7 @@
 
 (defn pmap
   "A lazy pmap where the work happens in a threadpool, just like core pmap, but
-  using claypoole futures.
+  using Claypoole futures in the given threadpool.
 
   Unlike core pmap, it doesn't assume the buffer size is nprocessors + 2;
   instead, it tries to fill the pool.
@@ -237,7 +237,7 @@
   Similar to pfor, only the body is done in parallel. For more details, see
   pfor."
   [pool bindings & body]
-  ;; There's no sensible lazy version of this, so just use base claypoole's
+  ;; There's no sensible lazy version of this, so just use base Claypoole's
   ;; implementation.
   `(cp/pdoseq ~pool ~bindings ~@body))
 
@@ -245,6 +245,6 @@
   "Like run!, but in parallel. Unlike the streaming sequence functions (e.g.
   pmap), prun! blocks until all the work is done."
   [pool proc coll]
-  ;; There's no sensible lazy version of this, so just use base claypoole's
+  ;; There's no sensible lazy version of this, so just use base Claypoole's
   ;; implementation.
   (cp/prun! pool proc coll))
