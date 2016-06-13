@@ -239,8 +239,9 @@
 
   The threadpool may be one of 3 things:
     1. An ExecutorService, e.g. one created by threadpool.
-    2. The keyword :builtin. In this case, the future will use the same
-       threadpool as an ordinary clojure.core/future.
+    2. The keyword :builtin. In this case, the future will use the built-in
+       agent threadpool, the same threadpool used by an ordinary
+       clojure.core/future.
     3. The keyword :serial. In this case, the computation will be performed in
        serial. This may be helpful during profiling, for example.
   "
@@ -279,8 +280,9 @@
 
   The threadpool may be one of 3 things:
     1. An ExecutorService, e.g. one created by threadpool.
-    2. The keyword :builtin. In this case, the future will use the same
-       threadpool as an ordinary clojure.core/future.
+    2. The keyword :builtin. In this case, the future will use the built-in
+       agent threadpool, the same threadpool used by an ordinary
+       clojure.core/future.
     3. The keyword :serial. In this case, the computation will be performed in
        serial. This may be helpful during profiling, for example.
   "
