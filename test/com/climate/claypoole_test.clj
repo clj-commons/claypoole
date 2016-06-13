@@ -906,3 +906,22 @@
   (test-parallel-do
     "prun!"
     (fn [pool f s] (cp/prun! pool f s))))
+
+(deftest test-default-pmap-buffer
+  (testing "binding *default-pmap-buffer* has the desired effect"
+    ;; *default-pmap-buffer* is only used if we can't get the pool size for
+    ;; some reason.
+    (with-redefs [impl/get-pool-size (constantly nil)]
+      (let [start (promise)
+            started (atom [])
+            tasks (binding [cp/*default-pmap-buffer* 3]
+                    (cp/pmap 10
+                             (fn [i]
+                               (swap! started conj i)
+                               (deref start))
+                             (range 10)))]
+        (Thread/sleep 100)
+        ;; As requested, only 3 items have been started
+        (is (= @started (range 3)))
+        (deliver start true)
+        (dorun tasks)))))
