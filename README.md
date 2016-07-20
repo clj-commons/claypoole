@@ -416,7 +416,27 @@ easily.
 
 You might also like using [dirigiste](https://github.com/ztellman/dirigiste)
 threadpools with Claypoole. Dirigiste provides a fast, instrumented
-ExecutorService that scales in a controllable way.
+ExecutorService that scales in a controllable way. Note that dirigiste by
+default creates thread pools that throw exceptions when full, which makes it
+hard for Claypoole to enqueue tasks. Instead, you can use the Executor
+constructor directly, though it's a bit ugly:
+
+```clojure
+(def pool
+  (io.aleph.dirigiste.Executor.
+    (java.util.concurrent.Executors/defaultThreadFactory)
+    ;; Here's where we insert our non-error queue
+    (java.util.concurrent.LinkedBlockingQueue.)
+    (io.aleph.dirigiste.Executors/fixedController n-threads)
+    n-threads
+    ;; Metrics to capture
+    (java.util.EnumSet/noneOf io.aleph.dirigiste.Stats$Metric)
+    ;; Dirigiste default sample period
+    25
+    ;; Dirigiste default control period
+    10000
+    java.util.concurrent.TimeUnit/MILLISECONDS))
+```
 
 ## OMG My program isn't exiting!
 
