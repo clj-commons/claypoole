@@ -287,7 +287,7 @@
        serial. This may be helpful during profiling, for example.
   "
   [pool & body]
-  `(future-call ~pool (^{:once true} fn future-body [] ~@body)))
+  `(future-call ~pool (^{:once true} fn ~'future-body [] ~@body)))
 
 (defn- buffer-blocking-seq
   "Make a lazy sequence that blocks when the map's (imaginary) buffer is full."
