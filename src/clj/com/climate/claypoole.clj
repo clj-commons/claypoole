@@ -202,7 +202,7 @@
 
   Examples:
 
-      (with-shutdown! [pool (theadpool 6)]
+      (with-shutdown! [pool (threadpool 6)]
         (doall (pmap pool identity (range 1000))))
       (with-shutdown! [pool1 6
                        pool2 :serial]
