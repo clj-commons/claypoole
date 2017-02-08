@@ -99,7 +99,7 @@
                 (instance? ExecutorService pool))
     (throw (IllegalArgumentException.
              (format
-               (str "Theadpool futures require a threadpool, :builtin, or "
+               (str "Threadpool futures require a threadpool, :builtin, or "
                     ":serial, not %s.") pool)))))
 
 (defonce ^{:doc "The previously-used threadpool ID."}
