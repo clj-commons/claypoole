@@ -12,7 +12,7 @@ dependency:
 
 Claypoole gives us tools to deal with common parallelism issues by letting us
 use and manage our own threadpools (a.k.a. thread pools). Our [blog
-posting](http://eng.climate.com/2014/02/25/claypoole-threadpool-tools-for-clojure)
+post](doc/BLOG.md)
 gives a nice overview of the project and its motivations.
 
 Also, if you like learning via video, Leon gave [a talk at Clojure West
