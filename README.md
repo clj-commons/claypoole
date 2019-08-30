@@ -8,6 +8,9 @@ dependency:
 [![Clojars Project](http://clojars.org/com.climate/claypoole/latest-version.svg)](http://clojars.org/com.climate/claypoole)
 [![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/claypoole/status.svg)](http://jarkeeper.com/TheClimateCorporation/claypoole)
 
+Docs at
+[![cljdoc badge](https://cljdoc.org/badge/com.climate/claypoole)](https://cljdoc.org/d/com.climate/claypoole/CURRENT)
+
 ## Why do you use claypoole?
 
 Claypoole gives us tools to deal with common parallelism issues by letting us
