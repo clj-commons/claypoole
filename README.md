@@ -6,9 +6,8 @@ functions such as `pmap`, `future`, and `for`.
 Claypoole is available in the Clojars repository. Just use this leiningen
 dependency:
 [![Clojars Project](http://clojars.org/com.climate/claypoole/latest-version.svg)](http://clojars.org/com.climate/claypoole)
-[![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/claypoole/status.svg)](http://jarkeeper.com/TheClimateCorporation/claypoole)
 
-Docs at
+[![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/claypoole/status.svg)](http://jarkeeper.com/TheClimateCorporation/claypoole)
 [![cljdoc badge](https://cljdoc.org/badge/com.climate/claypoole)](https://cljdoc.org/d/com.climate/claypoole/CURRENT)
 
 ## Why do you use claypoole?
@@ -102,6 +101,14 @@ available. This works well with our eager streaming, so we can chain together
 streams using the same or different threadpools to get work done as quickly as
 possible.
 
+
+The unordered versions of core functions are:
+* `upmap`
+* `upcalls`
+* `upvalues`
+
+Here is an example of them in use.
+
 ```clojure
 (require '[com.climate.claypoole :as cp])
 ;; We'll use the with-shutdown! form to guarantee that pools are cleaned up.
@@ -117,7 +124,7 @@ possible.
   (doall results))
 ```
 
-Claypoole provides ordered and unordered parallel `for` macros. Note that only
+Claypoole also provides ordered and unordered parallel `for` macros. Note that only
 the bodies of the for loops will be run in parallel; everything in the for
 binding will be done in the calling thread.
 
@@ -483,6 +490,9 @@ above section on disposing of threadpools.
 The claypoole library is named after [John Claypoole (Betsy Ross's third
 husband)](http://en.wikipedia.org/wiki/Betsy_Ross) for reasons that are at
 best obscure.
+
+## API Documentation
+Documentation is available at [![cljdoc badge](https://cljdoc.org/badge/com.climate/claypoole)](https://cljdoc.org/d/com.climate/claypoole/CURRENT)
 
 ## License
 
