@@ -85,6 +85,8 @@ start work going and know it'll get done. But if you try to `pmap` over
 (def pool (cp/threadpool 2))
 ;; Future
 (def fut (cp/future pool (myfn myinput)))
+;; Completable Future
+(def cfut (cp/completable-future pool (myfn myinput)))
 ;; Ordered pmap
 (def intermediates (cp/pmap pool myfn1 myinput-a myinput-b))
 ;; We can feed the streaming sequence right into another parallel function.
