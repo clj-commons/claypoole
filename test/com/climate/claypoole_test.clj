@@ -774,6 +774,49 @@
     (testing "Futures can be chained in various threadpools."
       (check-chaining pmap-like))))
 
+(deftest test-completable-future
+  (testing "basic completable-future test"
+    (cp/with-shutdown! [pool 3]
+      (let [a (atom false)
+            f (cp/completable-future
+                pool
+                ;; Body can contain multiple elements.
+                (reset! a true)
+                (range 10))]
+        (is (= @f (range 10)))
+        (is (true? @a)))))
+  (testing "completable-future threadpool args"
+    (is (thrown? IllegalArgumentException (cp/completable-future 3 (inc 1))))
+    (is (thrown? IllegalArgumentException (cp/completable-future nil (inc 1))))
+    (is (= 2 @(cp/completable-future :builtin (inc 1))))
+    (is (= 2 @(cp/completable-future :serial (inc 1)))))
+  (letfn [(pmap-like [pool work input]
+            (map impl/deref-fixing-exceptions
+                 (doall
+                   (for [i input]
+                     (cp/completable-future pool (work i))))))]
+    (testing "completable-future runs simultaneously"
+      (check-parallel pmap-like true))
+    (testing "completable-future throws exceptions okay"
+      (check-fn-exception pmap-like))
+    (testing "completable-future throws exceptions okay"
+      (check-fn-throwable pmap-like))
+    (testing "completable-future doesn't do too much parallelism"
+      ;; We don't check the number or nil cases because future doesn't accept
+      ;; those.
+      (doseq [[pool n shutdown?]
+              [[(cp/threadpool 10) 10 true]
+               [:serial 1 false]]]
+        (check-maximum-parallelism-one-case
+          pmap-like n pool)
+        (when shutdown? (.shutdown pool))))
+    (testing "Binding cp/*parallel* can disable parallelism in completable-future"
+      (check-*parallel*-disables pmap-like))
+    (testing "completable-future throws exceptions when tasks are sent to a shutdown pool"
+      (check-shutdown-exceptions pmap-like))
+    (testing "completable-future can be chained in various threadpools."
+      (check-chaining pmap-like))))
+
 (deftest test-pmap
   (check-all "pmap" cp/pmap true true false))
 
@@ -819,7 +862,7 @@
                       pool#
                       ~@(for [i input]
                           (list worksym i)))))
-                 pool work)))]
+               pool work)))]
     (check-all "pvalues" pmap-like true false false)))
 
 (deftest test-upvalues
@@ -835,7 +878,7 @@
                       pool#
                       ~@(for [i input]
                           (list worksym i)))))
-                 pool work)))]
+               pool work)))]
     (check-all "upvalues" pmap-like false false false)))
 
 (deftest test-pfor
@@ -890,11 +933,11 @@
       ;; Ok, tell those threads to go.
       (deliver blocker true)
       (is @complete)
-      (is (= (range 10) (sort @processed)))))
+      (is (= (range 10) (sort @processed))))))
   ;; We don't run the whole battery of tests because (1) it's hard to make a
   ;; pmap-like function out of pdoseq, and (2) pdoseq is just (comp dorun
   ;; upmap).
-  )
+  
 
 (deftest test-pdoseq
   (test-parallel-do

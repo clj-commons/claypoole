@@ -24,6 +24,7 @@
     [clojure.core :as core]
     [com.climate.claypoole.impl :as impl])
   (:import
+    [java.util.function Supplier]
     [com.climate.claypoole.impl
      PriorityThreadpool
      PriorityThreadpoolImpl]
@@ -32,6 +33,7 @@
      CancellationException
      ExecutorService
      Future
+     CompletableFuture
      LinkedBlockingQueue
      ScheduledExecutorService]))
 
@@ -288,6 +290,44 @@
   "
   [pool & body]
   `(future-call ~pool (^{:once true} fn ~'future-body [] ~@body)))
+
+(defn completable-future-call
+  "Like clojure.core/future-call, but using a threadpool, and returns a CompletableFuture.
+
+  The threadpool may be one of 3 things:
+  1. An ExecutorService, e.g. one created by threadpool.
+  2. The keyword :builtin. In this case, the future will use the built-in
+  agent threadpool, the same threadpool used by an ordinary
+  clojure.core/future.
+  3. The keyword :serial. In this case, the computation will be performed in
+  serial. This may be helpful during profiling, for example.
+  "
+  [pool f]
+  (impl/validate-future-pool pool)
+  (cond
+   ;; If requested, run the future in serial.
+   (serial? pool) (CompletableFuture/completedFuture (f))
+   ;; If requested, use the default threadpool.
+   (= :builtin pool) (completable-future-call clojure.lang.Agent/soloExecutor f)
+   :else
+   (CompletableFuture/supplyAsync
+    (reify Supplier
+      (get [_]
+        (f))) pool)))
+
+(defmacro completable-future
+  "Like clojure.core/future, but using a threadpool and returns a CompletableFuture.
+
+  The threadpool may be one of 3 things:
+    1. An ExecutorService, e.g. one created by threadpool.
+    2. The keyword :builtin. In this case, the future will use the built-in
+       agent threadpool, the same threadpool used by an ordinary
+       clojure.core/future.
+    3. The keyword :serial. In this case, the computation will be performed in
+       serial. This may be helpful during profiling, for example.
+  "
+  [pool & body]
+  `(completable-future-call ~pool (^{:once true} fn ~'completable-future-body [] ~@body)))
 
 (defn- buffer-blocking-seq
   "Make a lazy sequence that blocks when the map's (imaginary) buffer is full."
