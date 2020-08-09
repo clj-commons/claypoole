@@ -933,11 +933,11 @@
       ;; Ok, tell those threads to go.
       (deliver blocker true)
       (is @complete)
-      (is (= (range 10) (sort @processed))))))
+      (is (= (range 10) (sort @processed)))))
   ;; We don't run the whole battery of tests because (1) it's hard to make a
   ;; pmap-like function out of pdoseq, and (2) pdoseq is just (comp dorun
   ;; upmap).
-  
+  )
 
 (deftest test-pdoseq
   (test-parallel-do
