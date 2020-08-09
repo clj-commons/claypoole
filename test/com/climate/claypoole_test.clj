@@ -965,6 +965,6 @@
                              (range 10)))]
         (Thread/sleep 100)
         ;; As requested, only 3 items have been started
-        (is (= @started (range 3)))
+        (is (= (set @started) (set (range 3))))
         (deliver start true)
         (dorun tasks)))))
