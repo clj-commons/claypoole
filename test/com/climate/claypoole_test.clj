@@ -25,6 +25,7 @@
      ExecutorService
      LinkedBlockingQueue]))
 
+(def ^:dynamic *test-context* nil)
 
 (defn callable
   "Just a cast."
@@ -785,6 +786,14 @@
                 (range 10))]
         (is (= @f (range 10)))
         (is (true? @a)))))
+  (testing "bindings completable-future test"
+    (cp/with-shutdown! [pool 3]
+      (binding [*test-context* ::bound-value]
+        (let [f (cp/completable-future
+                  pool
+                  ;; Body can contain multiple elements.
+                  *test-context*)]
+          (is (= @f ::bound-value))))))
   (testing "completable-future threadpool args"
     (is (thrown? IllegalArgumentException (cp/completable-future 3 (inc 1))))
     (is (thrown? IllegalArgumentException (cp/completable-future nil (inc 1))))
