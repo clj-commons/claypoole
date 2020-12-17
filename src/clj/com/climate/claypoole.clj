@@ -310,10 +310,11 @@
    ;; If requested, use the default threadpool.
    (= :builtin pool) (completable-future-call clojure.lang.Agent/soloExecutor f)
    :else
-   (CompletableFuture/supplyAsync
-    (reify Supplier
-      (get [_]
-        (f))) pool)))
+   (let [f* (impl/binding-conveyor-fn f)]
+     (CompletableFuture/supplyAsync
+      (reify Supplier
+        (get [_]
+          (f*))) pool))))
 
 (defmacro completable-future
   "Like clojure.core/future, but using a threadpool and returns a CompletableFuture.
