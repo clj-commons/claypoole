@@ -576,6 +576,7 @@
           (let [p (promise)]
             (pmap-like 4 #(when (= % 9) (deliver p %)) (range 10))
             (deref p)
+            (Thread/sleep 1)
             (is (true? (cp/shutdown? @apool)))))))))
 
 ;; A simple object to call a function at finalize.
@@ -614,6 +615,11 @@
     (doseq [i (range 200)
             :while (not @a)]
       (Thread/sleep 1))
+    (dotimes [_ 2]
+      ;; This test can be flaky because GC is so funky. Try GC'ing several
+      ;; times.
+      (System/gc)
+      (Thread/sleep 10))
     ;; Verify that the task was GC'd
     (is (= @a :finalized))
     ;; Complete the map
