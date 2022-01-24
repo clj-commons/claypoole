@@ -1,14 +1,11 @@
+[![Clojars Project](http://clojars.org/com.climate/claypoole/latest-version.svg)](http://clojars.org/com.climate/claypoole)
+[![cljdoc badge](https://cljdoc.org/badge/com.climate/claypoole/claypoole)](https://cljdoc.org/d/com.climate/claypoole/claypoole)
+[![CircleCI](https://circleci.com/gh/clj-commons/claypoole.svg?style=svg)](https://circleci.com/gh/clj-commons/claypoole)
+
 # Claypoole: Threadpool tools for Clojure
 
 The claypoole library provides threadpool-based parallel versions of Clojure
 functions such as `pmap`, `future`, and `for`.
-
-Claypoole is available in the Clojars repository. Just use this leiningen
-dependency:
-[![Clojars Project](http://clojars.org/com.climate/claypoole/latest-version.svg)](http://clojars.org/com.climate/claypoole)
-
-[![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/claypoole/status.svg)](http://jarkeeper.com/TheClimateCorporation/claypoole)
-[![cljdoc badge](https://cljdoc.org/badge/com.climate/claypoole)](https://cljdoc.org/d/com.climate/claypoole/CURRENT)
 
 ## Why do you use claypoole?
 
