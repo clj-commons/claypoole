@@ -1,5 +1,5 @@
 [![Clojars Project](https://img.shields.io/clojars/v/com.climate/claypoole)](https://clojars.org/com.climate/claypoole)
-[![cljdoc badge](https://cljdoc.org/badge/com.climate/claypoole/claypoole)](https://cljdoc.org/d/com.climate/claypoole/claypoole)
+[![cljdoc badge](https://cljdoc.org/badge/com.climate/claypoole)](https://cljdoc.org/d/com.climate/claypoole)
 [![CircleCI](https://circleci.com/gh/clj-commons/claypoole.svg?style=svg)](https://circleci.com/gh/clj-commons/claypoole)
 
 # Claypoole: Threadpool tools for Clojure
