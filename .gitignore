@@ -9,3 +9,6 @@ pom.xml
 /lib/
 /target/
 .lein-deps-sum
+.portal
+.lsp/
+.clj-kondo/

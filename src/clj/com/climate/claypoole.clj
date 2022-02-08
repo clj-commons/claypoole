@@ -20,22 +20,15 @@
   general, you can use your own ExecutorService in place of any threadpool, and
   you can treat a threadpool as you would any other ExecutorService."
   (:refer-clojure :exclude [future future-call pcalls pmap pvalues])
-  (:require
-    [clojure.core :as core]
-    [com.climate.claypoole.impl :as impl])
-  (:import
-    [java.util.function Supplier]
-    [com.climate.claypoole.impl
-     PriorityThreadpool
-     PriorityThreadpoolImpl]
-    [java.util.concurrent
-     Callable
-     CancellationException
-     ExecutorService
-     Future
-     CompletableFuture
-     LinkedBlockingQueue
-     ScheduledExecutorService]))
+  (:require [clojure.core :as core]
+            [com.climate.claypoole.impl :as impl])
+  (:import [com.climate.claypoole.impl PriorityThreadpool PriorityThreadpoolImpl]
+           [java.util.concurrent
+            Callable
+            ExecutorService
+            Future
+            CompletableFuture]
+           [java.util.function Supplier]))
 
 
 (def ^:dynamic *parallel*
@@ -68,7 +61,7 @@
 
   This is exposed as a public function because it's handy if you're
   instantiating your own ExecutorServices."
-  [& {:keys [daemon thread-priority] pool-name :name
+  [& {:keys [_daemon _thread-priority] _pool-name :name
       :as args}]
   (->> args
        (apply concat)
@@ -122,11 +115,11 @@
   [n & {:keys [default-priority] :as args
         :or {default-priority 0}}]
   (PriorityThreadpool.
-    (PriorityThreadpoolImpl. n
+   (PriorityThreadpoolImpl. n
                              ;; Use our thread factory options.
-                             (impl/apply-map impl/thread-factory args)
-                             default-priority)
-    (constantly default-priority)))
+                            (impl/apply-map impl/thread-factory args)
+                            default-priority)
+   (constantly default-priority)))
 
 (defn with-priority-fn
   "Make a priority-threadpool wrapper that uses a given priority function.
@@ -219,7 +212,7 @@
   [pool-syms-and-inits & body]
   (when-not (even? (count pool-syms-and-inits))
     (throw (IllegalArgumentException.
-             "with-shutdown! requires an even number of binding forms")))
+            "with-shutdown! requires an even number of binding forms")))
   (if (empty? pool-syms-and-inits)
     `(do ~@body)
     (let [[pool-sym pool-init & more] pool-syms-and-inits]
@@ -306,15 +299,15 @@
   (impl/validate-future-pool pool)
   (cond
    ;; If requested, run the future in serial.
-   (serial? pool) (CompletableFuture/completedFuture (f))
+    (serial? pool) (CompletableFuture/completedFuture (f))
    ;; If requested, use the default threadpool.
-   (= :builtin pool) (completable-future-call clojure.lang.Agent/soloExecutor f)
-   :else
-   (let [f* (impl/binding-conveyor-fn f)]
-     (CompletableFuture/supplyAsync
-      (reify Supplier
-        (get [_]
-          (f*))) pool))))
+    (= :builtin pool) (completable-future-call clojure.lang.Agent/soloExecutor f)
+    :else
+    (let [f* (impl/binding-conveyor-fn f)]
+      (CompletableFuture/supplyAsync
+       (reify Supplier
+         (get [_]
+           (f*))) pool))))
 
 (defmacro completable-future
   "Like clojure.core/future, but using a threadpool and returns a CompletableFuture.
@@ -351,29 +344,29 @@
         [task-q tasks] (impl/queue-seq)
         [unordered-results-q unordered-results] (impl/queue-seq)
         ;; This is how we'll actually make things go.
-        start-task (fn [i a]
+        start-task (fn [_i a]
                      ;; We can't directly make a future add itself to a
                      ;; queue. Instead, we use a promise for indirection.
                      (let [p (promise)]
                        (deliver p (future-call
-                                    pool
-                                    (with-meta
+                                   pool
+                                   (with-meta
                                       ;; Try to run the task, but definitely
                                       ;; add the future to the queue.
-                                      #(try
-                                         (apply f a)
-                                         (catch Throwable t
+                                     #(try
+                                        (apply f a)
+                                        (catch Throwable t
                                            ;; If we've had an exception, stop
                                            ;; making new tasks.
-                                           (reset! abort true)
+                                          (reset! abort true)
                                            ;; Re-throw that throwable!
-                                           (throw t))
-                                         (finally
-                                           (impl/queue-seq-add!
-                                             unordered-results-q @p)))
+                                          (throw t))
+                                        (finally
+                                          (impl/queue-seq-add!
+                                           unordered-results-q @p)))
                                       ;; Add the args to the function's
                                       ;; metadata for prioritization.
-                                      {:args a})))
+                                     {:args a})))
                        @p))
         ;; Start all the tasks in a real future, so we don't block.
         driver (core/future
@@ -395,16 +388,16 @@
                      (map second (impl/lazy-co-read tasks unordered-results)))]
     ;; Read results as available.
     (concat
-      (map impl/deref-fixing-exceptions result-seq)
+     (map impl/deref-fixing-exceptions result-seq)
       ;; Deref the read-future to get its exceptions, if it has any.
-      (lazy-seq @driver))))
+     (lazy-seq @driver))))
 
 (defn- pmap-boilerplate
   "Do boilerplate pmap checks, then call the real pmap function."
   [pool ordered? f arg-seqs]
   (when (empty? arg-seqs)
     (throw (IllegalArgumentException.
-             "pmap requires at least one sequence to map over")))
+            "pmap requires at least one sequence to map over")))
   (if (serial? pool)
     (doall (apply map f arg-seqs))
     (pmap-core pool ordered? f arg-seqs)))
