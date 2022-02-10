@@ -3,7 +3,7 @@ CHANGES
 Unreleased
 
 - Change group-id to org.clj-commons
-
+- Build using openjdk-8 and switched to 1.8 compile version.
 
 1.1.3
 
