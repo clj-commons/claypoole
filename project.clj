@@ -11,10 +11,10 @@
 ;; or implied.  See the License for the specific language governing permissions
 ;; and limitations under the License.
 
-(defproject com.climate/claypoole
-  "1.1.5-SNAPSHOT"
+(defproject org.clj-commons/claypoole
+  "1.2.0-SNAPSHOT"
   :description "Claypoole: Threadpool tools for Clojure."
-  :url "http://github.com/TheClimateCorporation/claypoole/"
+  :url "https://github.com/clj-commons/claypoole"
   :license {:name "Apache License Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"
             :distribution :repo}
