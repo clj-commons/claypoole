@@ -68,7 +68,7 @@
                                         ;; Use with-meta for priority
                                         ;; threadpools
                                         (with-meta #(apply f a)
-                                                   {:args a}))))
+                                          {:args a}))))
            ;; force buffer-size futures to start work in the pool
            (forceahead (or buffer-size (impl/get-pool-size pool) 0))
            ;; read the results from the futures
@@ -105,11 +105,11 @@
                     (let [p (promise)]
                       @(deliver p
                                 (cp/future-call
-                                  pool
+                                 pool
                                   ;; Use with-meta for priority threadpools
-                                  (with-meta #(try (apply f a)
-                                                   (finally (.put result-q @p)))
-                                             {:args a})))))]
+                                 (with-meta #(try (apply f a)
+                                                  (finally (.put result-q @p)))
+                                   {:args a})))))]
       (->> colls
            ;; make sure we're not chunking
            (map impl/unchunk)
@@ -121,7 +121,7 @@
            (forceahead buffer-size)
            ;; read the results from the futures in the queue
            (map (fn [_] (impl/deref-fixing-exceptions (.take result-q))))
-           (impl/seq-open #(if shutdown? (cp/shutdown pool)))))))
+           (impl/seq-open #(when shutdown? (cp/shutdown pool)))))))
 
 (defn upmap
   "Like pmap, but with results returned in the order they completed.

@@ -13,26 +13,19 @@
 
 (ns com.climate.claypoole.impl
   "Implementation helper functions for Claypoole."
-  (:require
-    [clojure.core :as core])
-  (:import
-    [clojure.lang
-     IFn]
-    [com.climate.claypoole.impl
-     Prioritized
-     PriorityThreadpoolImpl]
-    [java.util
-     Collection
-     List]
-    [java.util.concurrent
-     ExecutionException
-     Executors
-     ExecutorService
-     Future
-     LinkedBlockingQueue
-     ThreadFactory
-     TimeoutException
-     TimeUnit]))
+  (:require [clojure.core :as core])
+  (:import [clojure.lang IFn]
+           [com.climate.claypoole.impl Prioritized PriorityThreadpoolImpl]
+           [java.util Collection List]
+           [java.util.concurrent
+            ExecutionException
+            Executors
+            ExecutorService
+            Future
+            LinkedBlockingQueue
+            ThreadFactory
+            TimeoutException
+            TimeUnit]))
 
 
 (defn binding-conveyor-fn
@@ -52,8 +45,8 @@
    (.get fut))
   ([^Future fut timeout-ms timeout-val]
    (try (.get fut timeout-ms TimeUnit/MILLISECONDS)
-     (catch TimeoutException e
-       timeout-val))))
+        (catch TimeoutException _e
+          timeout-val))))
 
 (defn deref-fixing-exceptions
   "If a future experiences an exception and you dereference the future, you
@@ -63,14 +56,14 @@
   which can be much less surprising to downstream code."
   [fut]
   (try (deref fut)
-    (catch java.util.concurrent.ExecutionException e
-      (let [cause (.getCause e)]
+       (catch java.util.concurrent.ExecutionException e
+         (let [cause (.getCause e)]
         ;; Update the stack trace to include e
-        (.setStackTrace cause (into-array StackTraceElement
-                                          (concat
-                                            (.getStackTrace cause)
-                                            (.getStackTrace e))))
-        (throw cause)))))
+           (.setStackTrace cause (into-array StackTraceElement
+                                             (concat
+                                              (.getStackTrace cause)
+                                              (.getStackTrace e))))
+           (throw cause)))))
 
 (defn dummy-future-call
   "A dummy future-call that runs in serial and returns a future containing the
@@ -81,15 +74,15 @@
       clojure.lang.IDeref
       (deref [_] result)
       clojure.lang.IBlockingDeref
-      (deref [_ timeout-ms timeout-val] result)
+      (deref [_ _timeout-ms _timeout-val] result)
       clojure.lang.IPending
       (isRealized [_] true)
       Future
       (get [_] result)
-      (get [_ timeout unit] result)
+      (get [_ _timeout _unit] result)
       (isCancelled [_] false)
       (isDone [_] true)
-      (cancel [_ interrupt?] false))))
+      (cancel [_ _interrupt?] false))))
 
 (defn validate-future-pool
   "Verify that a threadpool is a valid pool for a future."
@@ -98,9 +91,9 @@
                 (= :builtin pool)
                 (instance? ExecutorService pool))
     (throw (IllegalArgumentException.
-             (format
-               (str "Threadpool futures require a threadpool, :builtin, or "
-                    ":serial, not %s.") pool)))))
+            (format
+             (str "Threadpool futures require a threadpool, :builtin, or "
+                  ":serial, not %s.") pool)))))
 
 (defonce ^{:doc "The previously-used threadpool ID."}
   threadpool-id
@@ -130,17 +123,17 @@
   (let [daemon* (boolean daemon)
         pool-name* (or pool-name (default-threadpool-name))
         thread-priority* (or thread-priority
-                             (.getPriority (Thread/currentThread)))]
-    (let [default-factory (Executors/defaultThreadFactory)
+                             (.getPriority (Thread/currentThread)))
+        default-factory (Executors/defaultThreadFactory)
           ;; The previously-used thread ID. Start at -1 so we can just use the
           ;; return value of (swap! inc).
-          thread-id (atom -1)]
-      (reify ThreadFactory
-        (^Thread newThread [_ ^Runnable r]
-          (doto (.newThread default-factory r)
-            (.setDaemon daemon*)
-            (.setName (str pool-name* "-" (swap! thread-id inc)))
-            (.setPriority thread-priority*)))))))
+        thread-id (atom -1)]
+    (reify ThreadFactory
+      (^Thread newThread [_ ^Runnable r]
+        (doto (.newThread default-factory r)
+          (.setDaemon daemon*)
+          (.setName (str pool-name* "-" (swap! thread-id inc)))
+          (.setPriority thread-priority*))))))
 
 (defn unchunk
   "Takes a seqable and returns a lazy sequence that is maximally lazy.
@@ -148,9 +141,9 @@
   Based on http://stackoverflow.com/questions/3407876/how-do-i-avoid-clojures-chunking-behavior-for-lazy-seqs-that-i-want-to-short-ci"
   [s]
   (lazy-seq
-    (when-let [s (seq s)]
-      (cons (first s)
-            (unchunk (rest s))))))
+   (when-let [s (seq s)]
+     (cons (first s)
+           (unchunk (rest s))))))
 
 (defn threadpool
   "Make a threadpool. It should be shutdown when no longer needed.
@@ -177,7 +170,7 @@
                    (long (apply priority-fn (-> task meta :args)))
                    (catch Exception e
                      (throw (ExecutionException.
-                              "Priority function exception" e))))]
+                             "Priority function exception" e))))]
     (reify
       Callable
       (call [_] (.call ^Callable task))
@@ -228,9 +221,9 @@
     (= :builtin arg) [false clojure.lang.Agent/soloExecutor]
     (= :serial arg) [false :serial]
     :else (throw (IllegalArgumentException.
-                   (format
-                     (str "Claypoole functions require a threadpool, a "
-                          "number, :builtin, or :serial, not %s.") arg)))))
+                  (format
+                   (str "Claypoole functions require a threadpool, a "
+                        "number, :builtin, or :serial, not %s.") arg)))))
 
 (defn get-pool-size
   "If the pool has a max size, get that; else, return nil."
@@ -255,9 +248,9 @@
     end-marker object."
     [^LinkedBlockingQueue q]
     (lazy-seq
-      (let [x (.take q)]
-        (when-not (identical? x end-marker)
-          (cons x (queue-reader q))))))
+     (let [x (.take q)]
+       (when-not (identical? x end-marker)
+         (cons x (queue-reader q))))))
 
   (defn queue-seq
     "Create a queue and a lazy sequence that reads from that queue."
@@ -312,8 +305,8 @@
   [pool bindings body pmap-fn-sym]
   (when (vector? pool)
     (throw (IllegalArgumentException.
-             (str "Got a vector instead of a pool--"
-                  "did you forget to use a threadpool?"))))
+            (str "Got a vector instead of a pool--"
+                 "did you forget to use a threadpool?"))))
   (if-not (= :priority (first (take-last 2 bindings)))
     ;; If there's no priority, everything is simple.
     `(~pmap-fn-sym ~pool #(%) (for ~bindings (fn [] ~@body)))
@@ -335,13 +328,13 @@
   not a macro, not necessarily calling .close, and for a lazy seq."
   [f s]
   (lazy-seq
-    (let [sprime (try
+   (let [sprime (try
                    ;; force one element of s to make exceptions happen here
-                   (when-let [s (seq s)]
-                     (cons (first s) (rest s)))
-                   (catch Throwable t
-                     (f)
-                     (throw t)))]
-      (if (seq sprime)
-        (cons (first sprime) (seq-open f (rest sprime)))
-        (do (f) nil)))))
+                  (when-let [s (seq s)]
+                    (cons (first s) (rest s)))
+                  (catch Throwable t
+                    (f)
+                    (throw t)))]
+     (if (seq sprime)
+       (cons (first sprime) (seq-open f (rest sprime)))
+       (do (f) nil)))))
