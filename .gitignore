@@ -10,5 +10,4 @@ pom.xml
 /target/
 .lein-deps-sum
 .portal
-.lsp/
-.clj-kondo/
+.cache

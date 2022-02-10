@@ -54,6 +54,7 @@
   []
   (.. Runtime getRuntime availableProcessors))
 
+#_{:clj-kondo/ignore [:unused-binding]}
 (defn thread-factory
   "Create a ThreadFactory with keyword options including thread daemon status
   :daemon, the thread name format :name (a string for format with one integer),
@@ -61,7 +62,7 @@
 
   This is exposed as a public function because it's handy if you're
   instantiating your own ExecutorServices."
-  [& {:keys [_daemon _thread-priority] _pool-name :name
+  [& {:keys [daemon thread-priority] pool-name :name
       :as args}]
   (->> args
        (apply concat)
