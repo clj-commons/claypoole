@@ -11,3 +11,4 @@ pom.xml
 .lein-deps-sum
 .portal
 .cache
+.cpcache
