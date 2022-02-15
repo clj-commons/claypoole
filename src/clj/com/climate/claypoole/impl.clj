@@ -35,8 +35,14 @@
   (let [frame (clojure.lang.Var/cloneThreadBindingFrame)]
     (with-meta
       (fn []
-        (clojure.lang.Var/resetThreadBindingFrame frame)
-        (f))
+        (let [frame-before (clojure.lang.Var/getThreadBindingFrame)]
+          (clojure.lang.Var/resetThreadBindingFrame frame)
+          (try
+            (f)
+            (finally
+              ;; This does not matter for correctness, but prevents leaking
+              ;; data in binding frames in thread locals.
+              (clojure.lang.Var/resetThreadBindingFrame frame-before)))))
       (meta f))))
 
 (defn deref-future
