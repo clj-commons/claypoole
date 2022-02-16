@@ -1,10 +1,13 @@
 {:paths ["src/clj" "target/classes"]
- :deps {org.clojure/clojure {:mvn/version "1.9.0"}}
+ :deps {}
  :deps/prep-lib {:alias :build
                  :fn compile
                  :ensure "target/classes"}
  :aliases
- {:test {:extra-paths ["test"]
+ {:clojure-1.9 {:extra-deps {org.clojure/clojure {:mvn/version "1.9.0"}}}
+  :clojure-1.10 {:extra-deps {org.clojure/clojure {:mvn/version "1.10.3"}}}
+  :clojure-1.11 {:extra-deps {org.clojure/clojure {:mvn/version "1.11.0-beta1"}}}
+  :test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/url "https://github.com/cognitect-labs/test-runner.git"
                        :sha "9e35c979860c75555adaff7600070c60004a0f44"}}

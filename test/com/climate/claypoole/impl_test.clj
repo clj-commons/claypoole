@@ -12,9 +12,8 @@
 ;; and limitations under the License.
 
 (ns com.climate.claypoole.impl-test
-  (:require
-    [clojure.test :refer :all]
-    [com.climate.claypoole.impl :as impl]))
+  (:require [clojure.test :refer :all]
+            [com.climate.claypoole.impl :as impl]))
 
 
 (deftest test-queue-seq

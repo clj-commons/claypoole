@@ -12,18 +12,11 @@
 ;; and limitations under the License.
 
 (ns com.climate.claypoole-test
-  (:require
-    [clojure.test :refer :all]
-    [com.climate.claypoole :as cp]
-    [com.climate.claypoole.impl :as impl])
-  (:import
-    [com.climate.claypoole.impl
-     ;; Import to make Eastwood happy.
-     PriorityThreadpool]
-    [java.util.concurrent
-     ExecutionException
-     ExecutorService
-     LinkedBlockingQueue]))
+  (:require [clojure.test :refer :all]
+            [com.climate.claypoole :as cp]
+            [com.climate.claypoole.impl :as impl]
+            [com.climate.claypoole.test-helpers :as th])
+  (:import [java.util.concurrent ExecutionException ExecutorService]))
 
 (def ^:dynamic *test-context* nil)
 
@@ -73,10 +66,10 @@
       (let [start (promise)
             completed (atom [])
             tasks (doall
-                    (for [i (range 10)]
-                      (cp/future (cp/with-priority pool i)
-                                 (deref start)
-                                 (swap! completed conj i))))]
+                   (for [i (range 10)]
+                     (cp/future (cp/with-priority pool i)
+                                (deref start)
+                                (swap! completed conj i))))]
         ;; start tasks
         (Thread/sleep 100)
         (deliver start true)
@@ -89,20 +82,20 @@
       (let [start (promise)
             completed (atom [])
             tasks (doall
-                    (for [i (shuffle (range 100))]
-                      (cp/future (cp/with-priority pool i)
-                                 (deref start)
-                                 (swap! completed conj i))))]
+                   (for [i (shuffle (range 100))]
+                     (cp/future (cp/with-priority pool i)
+                                (deref start)
+                                (swap! completed conj i))))]
         ;; start tasks
         (deliver start true)
         ;; Wait for tasks to complete
         (doseq [f tasks] (deref f))
         (is (sorted*?
-              (-> completed
-                  deref
+             (-> completed
+                 deref
                   ;; The first task will be one at random, so drop it
-                  rest
-                  reverse))))))
+                 rest
+                 reverse))))))
   (testing "Priority threadpool default priority."
     (cp/with-shutdown! [pool (cp/priority-threadpool 1 :default-priority 50)]
       (let [start (promise)
@@ -110,8 +103,8 @@
             run (fn [result] (deref start) (swap! completed conj result))
             first-task (cp/future pool (run :first))
             tasks (doall
-                    (for [i [1 100]]
-                      (cp/future (cp/with-priority pool i) (run i))))
+                   (for [i [1 100]]
+                     (cp/future (cp/with-priority pool i) (run i))))
             default-task (cp/future pool (run :default))]
         ;; start tasks
         (deliver start true)
@@ -140,18 +133,18 @@
   (testing "with-priority-fn throws sensible exceptions"
     (cp/with-shutdown! [pool (cp/priority-threadpool 2)]
       (is (thrown-with-msg?
-            Exception #"Priority function exception"
+           Exception #"Priority function exception"
             ;; Arity exception.
-            (dorun
-              (cp/pmap (cp/with-priority-fn pool (fn [] 0))
-                       (fn [x y] (+ x y))
-                       (range 10) (range 10)))))
+           (dorun
+            (cp/pmap (cp/with-priority-fn pool (fn [] 0))
+                     (fn [x y] (+ x y))
+                     (range 10) (range 10)))))
       (is (thrown-with-msg?
             ;; No arguments passed to priority function.
-            Exception #"Priority function exception"
-            (deref (cp/future (cp/with-priority-fn
-                                pool (fn [& args] (first args)))
-                              1)))))))
+           Exception #"Priority function exception"
+           (deref (cp/future (cp/with-priority-fn
+                               pool (fn [& args] (first args)))
+                             1)))))))
 
 (deftest test-for-priority
   (testing "pfor uses priority"
@@ -159,11 +152,11 @@
       (let [start (promise)
             completed (atom [])
             tasks (cp/pfor pool
-                    [i (range 100)
-                     :priority (inc i)]
-                    (deref start)
-                    (swap! completed conj i)
-                    i)]
+                           [i (range 100)
+                            :priority (inc i)]
+                           (deref start)
+                           (swap! completed conj i)
+                           i)]
         (Thread/sleep 100)
         (deliver start true)
         (dorun tasks)
@@ -176,11 +169,11 @@
       (let [start (promise)
             completed (atom [])
             tasks (cp/upfor pool
-                    [i (range 100)
-                     :priority (inc i)]
-                    (deref start)
-                    (swap! completed conj i)
-                    i)]
+                            [i (range 100)
+                             :priority (inc i)]
+                            (deref start)
+                            (swap! completed conj i)
+                            i)]
         (Thread/sleep 100)
         (deliver start true)
         (dorun tasks)
@@ -296,12 +289,12 @@
         ;; Make sure outside of the with-shutdown block the pool is properly
         ;; killed.
         (when-not (keyword? arg) (is (true? (cp/shutdown? @outside-pool)))
-          (Thread/sleep 100)
-          (is (true? (.isTerminated @outside-pool)))
-          (deliver start true)
-          (Thread/sleep 100)
-          (is (.isDone @@fp))
-          (is (thrown? ExecutionException (deref @@fp)))))))
+                  (Thread/sleep 100)
+                  (is (true? (.isTerminated @outside-pool)))
+                  (deliver start true)
+                  (Thread/sleep 100)
+                  (is (.isDone @@fp))
+                  (is (thrown? ExecutionException (deref @@fp)))))))
   (testing "With-shutdown! works with any number of threadpools"
     (let [input (range 100)]
       (is (= input
@@ -455,13 +448,13 @@
         pool (cp/threadpool n)
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
-          NullPointerException #"keyword found"
-          (dorun (pmap-like pool
-                            (fn [i]
-                              (if (keyword? i)
-                                (throw (NullPointerException. "keyword found"))
-                                i))
-                            inputs))))
+         NullPointerException #"keyword found"
+         (dorun (pmap-like pool
+                           (fn [i]
+                             (if (keyword? i)
+                               (throw (NullPointerException. "keyword found"))
+                               i))
+                           inputs))))
     (.shutdown pool)))
 
 (defn check-fn-throwable
@@ -472,13 +465,13 @@
         pool (cp/threadpool n)
         inputs [0 1 2 3 :4 5 6 7 8 9]]
     (is (thrown-with-msg?
-          AssertionError #"keyword found"
-          (dorun (pmap-like pool
-                            (fn [i]
-                              (if (keyword? i)
-                                (throw (AssertionError. "keyword found"))
-                                i))
-                            inputs))))
+         AssertionError #"keyword found"
+         (dorun (pmap-like pool
+                           (fn [i]
+                             (if (keyword? i)
+                               (throw (AssertionError. "keyword found"))
+                               i))
+                           inputs))))
     (.shutdown pool)))
 
 (defn check-input-exception
@@ -490,11 +483,11 @@
         inputs (map #(if (< % 100)
                        %
                        (throw (Exception.
-                                "deliberate exception")))
+                               "deliberate exception")))
                     (range 200))]
     (is (thrown-with-msg?
-          Exception #"deliberate"
-          (dorun (pmap-like pool inc inputs))))
+         Exception #"deliberate"
+         (dorun (pmap-like pool inc inputs))))
     (.shutdown pool)))
 
 (defn check-maximum-parallelism-one-case
@@ -526,8 +519,8 @@
            [:builtin Integer/MAX_VALUE false]
            [:serial 1 false]]]
     (try (check-maximum-parallelism-one-case
-           pmap-like n pool)
-      (finally (when shutdown? (.shutdown pool))))))
+          pmap-like n pool)
+         (finally (when shutdown? (.shutdown pool))))))
 
 (defn check-*parallel*-disables
   "Check that binding cp/*parallel* can disable parallelism."
@@ -597,16 +590,16 @@
         finish (promise)
         task-runner (future
                       (dorun
-                        (pmap-fn 1 deref
-                                 (list
+                       (pmap-fn 1 deref
+                                (list
                                    ;; Have one task make a note when GC'd
-                                   (delay
-                                     (Finalizer.
-                                       #(reset! a :finalized)))
-                                   (delay 1)
-                                   (delay 2)
-                                   (delay (deliver started :started))
-                                   finish))))]
+                                 (delay
+                                  (Finalizer.
+                                   #(reset! a :finalized)))
+                                 (delay 1)
+                                 (delay 2)
+                                 (delay (deliver started :started))
+                                 finish))))]
     ;; Let the tasks run
     @started
     ;; Trigger GC
@@ -636,15 +629,15 @@
         started (promise)
         results (pmap-fn 4 deref
                          (concat ;; indicate we've started
-                                 (repeatedly 1 #(do (deliver started true)
-                                                  started))
+                          (repeatedly 1 #(do (deliver started true)
+                                             started))
                                  ;; block the map
-                                 (repeat 10 finish)
+                          (repeat 10 finish)
                                  ;; a long runway
-                                 (map atom (range 100))
+                          (map atom (range 100))
                                  ;; an indicator for whether we've realized
                                  ;; past the runway
-                                 (map indicator [:started])))]
+                          (map indicator [:started])))]
     ;; When genuinely lazy, we must force the sequence to start tasks.
     (when lazy? (future (doall results)))
     ;; Let the tasks run
@@ -757,8 +750,8 @@
   (letfn [(pmap-like [pool work input]
             (map impl/deref-fixing-exceptions
                  (doall
-                   (for [i input]
-                     (cp/future pool (work i))))))]
+                  (for [i input]
+                    (cp/future pool (work i))))))]
     (testing "future runs simultaneously"
       (check-parallel pmap-like true))
     (testing "future throws exceptions okay"
@@ -772,7 +765,7 @@
               [[(cp/threadpool 10) 10 true]
                [:serial 1 false]]]
         (check-maximum-parallelism-one-case
-          pmap-like n pool)
+         pmap-like n pool)
         (when shutdown? (.shutdown pool))))
     (testing "Binding cp/*parallel* can disable parallelism in future"
       (check-*parallel*-disables pmap-like))
@@ -786,19 +779,19 @@
     (cp/with-shutdown! [pool 3]
       (let [a (atom false)
             f (cp/completable-future
-                pool
+               pool
                 ;; Body can contain multiple elements.
-                (reset! a true)
-                (range 10))]
+               (reset! a true)
+               (range 10))]
         (is (= @f (range 10)))
         (is (true? @a)))))
   (testing "bindings completable-future test"
     (cp/with-shutdown! [pool 3]
       (binding [*test-context* ::bound-value]
         (let [f (cp/completable-future
-                  pool
+                 pool
                   ;; Body can contain multiple elements.
-                  *test-context*)]
+                 *test-context*)]
           (is (= @f ::bound-value))))))
   (testing "completable-future threadpool args"
     (is (thrown? IllegalArgumentException (cp/completable-future 3 (inc 1))))
@@ -808,8 +801,8 @@
   (letfn [(pmap-like [pool work input]
             (map impl/deref-fixing-exceptions
                  (doall
-                   (for [i input]
-                     (cp/completable-future pool (work i))))))]
+                  (for [i input]
+                    (cp/completable-future pool (work i))))))]
     (testing "completable-future runs simultaneously"
       (check-parallel pmap-like true))
     (testing "completable-future throws exceptions okay"
@@ -823,7 +816,7 @@
               [[(cp/threadpool 10) 10 true]
                [:serial 1 false]]]
         (check-maximum-parallelism-one-case
-          pmap-like n pool)
+         pmap-like n pool)
         (when shutdown? (.shutdown pool))))
     (testing "Binding cp/*parallel* can disable parallelism in completable-future"
       (check-*parallel*-disables pmap-like))
@@ -845,10 +838,10 @@
              (cp/pcalls pool #(inc 0) #(inc 1) #(inc 2) #(inc 3))))))
   (letfn [(pmap-like [pool work input]
             (apply
-              cp/pcalls
-              pool
-              (for [i input]
-                #(work i))))]
+             cp/pcalls
+             pool
+             (for [i input]
+               #(work i))))]
     (check-all "pcalls" pmap-like true true false)))
 
 (deftest test-upcalls
@@ -858,10 +851,10 @@
              (sort (cp/upcalls pool #(inc 0) #(inc 1) #(inc 2) #(inc 3)))))))
   (letfn [(pmap-like [pool work input]
             (apply
-              cp/upcalls
-              pool
-              (for [i input]
-                #(work i))))]
+             cp/upcalls
+             pool
+             (for [i input]
+               #(work i))))]
     (check-all "upcalls" pmap-like false true false)))
 
 (deftest test-pvalues
@@ -871,12 +864,12 @@
              (cp/pvalues pool (inc 0) (inc 1) (inc 2) (inc 3))))))
   (letfn [(pmap-like [pool work input]
             (let [worksym (gensym "work")]
-              ((eval
-                 `(fn [pool# ~worksym]
-                    (cp/pvalues
-                      pool#
-                      ~@(for [i input]
-                          (list worksym i)))))
+              ((th/eval+ex-unwrap
+                `(fn [pool# ~worksym]
+                   (cp/pvalues
+                    pool#
+                    ~@(for [i input]
+                        (list worksym i)))))
                pool work)))]
     (check-all "pvalues" pmap-like true false false)))
 
@@ -887,12 +880,12 @@
              (sort (cp/upvalues pool (inc 0) (inc 1) (inc 2) (inc 3)))))))
   (letfn [(pmap-like [pool work input]
             (let [worksym (gensym "work")]
-              ((eval
-                 `(fn [pool# ~worksym]
-                    (cp/upvalues
-                      pool#
-                      ~@(for [i input]
-                          (list worksym i)))))
+              ((th/eval+ex-unwrap
+                `(fn [pool# ~worksym]
+                   (cp/upvalues
+                    pool#
+                    ~@(for [i input]
+                        (list worksym i)))))
                pool work)))]
     (check-all "upvalues" pmap-like false false false)))
 
@@ -903,9 +896,9 @@
              (cp/pfor pool [i (range 10)] (inc i))))))
   (letfn [(pmap-like [pool work input]
             (cp/pfor
-              pool
-              [i input]
-              (work i)))]
+             pool
+             [i input]
+             (work i)))]
     (check-all "pfor" pmap-like true true false)))
 
 (deftest test-upfor
@@ -915,9 +908,9 @@
              (sort (cp/pfor pool [i (range 10)] (inc i)))))))
   (letfn [(pmap-like [pool work input]
             (cp/upfor
-              pool
-              [i input]
-              (work i)))]
+             pool
+             [i input]
+             (work i)))]
     (check-all "upfor" pmap-like false true false)))
 
 (defn test-parallel-do
@@ -935,8 +928,8 @@
       (future
         (do-fn 3
                (fn [i] (swap! started conj i)
-                   @blocker
-                   (swap! processed conj i))
+                 @blocker
+                 (swap! processed conj i))
                (range 10))
         (deliver complete true))
       (Thread/sleep 10)
@@ -956,14 +949,14 @@
 
 (deftest test-pdoseq
   (test-parallel-do
-    "pdoseq"
-    (fn [pool f s]
-        (cp/pdoseq pool [i s] (f i)))))
+   "pdoseq"
+   (fn [pool f s]
+     (cp/pdoseq pool [i s] (f i)))))
 
 (deftest test-prun!
   (test-parallel-do
-    "prun!"
-    (fn [pool f s] (cp/prun! pool f s))))
+   "prun!"
+   (fn [pool f s] (cp/prun! pool f s))))
 
 (deftest test-default-pmap-buffer
   (testing "binding *default-pmap-buffer* has the desired effect"
