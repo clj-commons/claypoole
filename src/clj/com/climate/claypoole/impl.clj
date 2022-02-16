@@ -63,7 +63,16 @@
                                              (concat
                                               (.getStackTrace cause)
                                               (.getStackTrace e))))
-           (throw cause)))))
+           (throw cause)))
+       (catch clojure.lang.Compiler$CompilerException e
+         (let [cause (.getCause e)]
+        ;; Update the stack trace to include e
+           (.setStackTrace cause (into-array StackTraceElement
+                                             (concat
+                                              (.getStackTrace cause)
+                                              (.getStackTrace e))))
+           (throw cause))
+         )))
 
 (defn dummy-future-call
   "A dummy future-call that runs in serial and returns a future containing the

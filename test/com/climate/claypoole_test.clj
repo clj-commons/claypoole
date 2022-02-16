@@ -685,10 +685,11 @@
   Arguments:
     fn-name     - the function's name for better logging/output
     pmap-like   - a function that works like pmap
+    handles-input-exceptions? - true iff the pmap function can handle input exceptions (i.e. doesn't use eval like the pvalues tests)
     ordered?    - true iff the pmap function returns results in the same order
     streaming?  - true iff the pmap function works on streaming sequences
     lazy?       - true iff the pmap function needs to be \"pumped\" by doall"
-  [fn-name pmap-like ordered? streaming? lazy?]
+  [fn-name pmap-like handles-input-exceptions? ordered? streaming? lazy?]
   (testing (format "%s maps" fn-name)
     (is (= (range 1 11) ((if ordered? identity sort)
                          (pmap-like 3 inc (range 10))))))
@@ -698,8 +699,9 @@
     (check-fn-exception pmap-like))
   (testing (format "%s emits non-Exception Throwables correctly" fn-name)
     (check-fn-throwable pmap-like))
-  (testing (format "%s handles input exceptions correctly" fn-name)
-    (check-input-exception pmap-like))
+  (when handles-input-exceptions?
+    (testing (format "%s handles input exceptions correctly" fn-name)
+      (check-input-exception pmap-like)))
   (testing (format "%s runs n things at once" fn-name)
     (check-maximum-parallelism pmap-like))
   (testing (format "%s uses ->threadpool correctly" fn-name)
@@ -833,10 +835,10 @@
       (check-chaining pmap-like))))
 
 (deftest test-pmap
-  (check-all "pmap" cp/pmap true true false))
+  (check-all "pmap" cp/pmap true true true false))
 
 (deftest test-upmap
-  (check-all "upmap" cp/upmap false true false))
+  (check-all "upmap" cp/upmap true false true false))
 
 (deftest test-pcalls
   (testing "basic pcalls test"
@@ -849,7 +851,7 @@
               pool
               (for [i input]
                 #(work i))))]
-    (check-all "pcalls" pmap-like true true false)))
+    (check-all "pcalls" pmap-like true true true false)))
 
 (deftest test-upcalls
   (testing "basic pcalls test"
@@ -862,7 +864,7 @@
               pool
               (for [i input]
                 #(work i))))]
-    (check-all "upcalls" pmap-like false true false)))
+    (check-all "upcalls" pmap-like true false true false)))
 
 (deftest test-pvalues
   (testing "basic pvalues test"
@@ -878,7 +880,7 @@
                       ~@(for [i input]
                           (list worksym i)))))
                pool work)))]
-    (check-all "pvalues" pmap-like true false false)))
+    (check-all "pvalues" pmap-like false true false false)))
 
 (deftest test-upvalues
   (testing "basic upvalues test"
@@ -894,7 +896,7 @@
                       ~@(for [i input]
                           (list worksym i)))))
                pool work)))]
-    (check-all "upvalues" pmap-like false false false)))
+    (check-all "upvalues" pmap-like false false false false)))
 
 (deftest test-pfor
   (testing "basic pfor test"
@@ -906,7 +908,7 @@
               pool
               [i input]
               (work i)))]
-    (check-all "pfor" pmap-like true true false)))
+    (check-all "pfor" pmap-like true true true false)))
 
 (deftest test-upfor
   (testing "basic upfor test"
@@ -918,7 +920,7 @@
               pool
               [i input]
               (work i)))]
-    (check-all "upfor" pmap-like false true false)))
+    (check-all "upfor" pmap-like true false true false)))
 
 (defn test-parallel-do
   [name- do-fn]

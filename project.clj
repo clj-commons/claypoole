@@ -22,8 +22,8 @@
   :source-paths ["src/clj"]
   :java-source-paths ["src/java"]
   :pedantic? :warn
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.9.0"]]}}
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.3"]]}}
   :plugins [[jonase/eastwood "0.2.3"]
             [lein-ancient "0.7.0"]]
-  ;; Make sure we build for Java 1.6 for improved backwards compatibility.
+  ;; Make sure we build for Java 1.8 for improved backwards compatibility.
   :javac-options ["-target" "1.8" "-source" "1.8"])
