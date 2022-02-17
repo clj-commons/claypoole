@@ -12,12 +12,11 @@
 ;; and limitations under the License.
 
 (ns com.climate.claypoole.lazy-test
-  (:require
-    [clojure.test :refer :all]
-    [com.climate.claypoole :as cp]
-    [com.climate.claypoole.impl :as impl]
-    [com.climate.claypoole.lazy :as lazy]
-    [com.climate.claypoole-test :as cptest]))
+  (:require [clojure.test :refer :all]
+            [com.climate.claypoole-test :as cptest]
+            [com.climate.claypoole.impl :as impl]
+            [com.climate.claypoole.lazy :as lazy]
+            [com.climate.claypoole.test-helpers :as th]))
 
 
 (defn check-input-laziness
@@ -110,40 +109,40 @@
            (lazy/pcalls 3 #(inc 0) #(inc 1) #(inc 2) #(inc 3)))))
   (letfn [(pmap-like [pool work input]
             (apply
-              lazy/pcalls
-              pool
-              (for [i input]
-                #(work i))))]
+             lazy/pcalls
+             pool
+             (for [i input]
+               #(work i))))]
     (check-all "pcalls" pmap-like true true)))
 
 (deftest test-pcalls-buffer
   (letfn [(pmap-like [pool buffer work input]
             (apply
-              lazy/pcalls-buffer
-              pool buffer
-              (for [i input]
-                #(work i))))]
+             lazy/pcalls-buffer
+             pool buffer
+             (for [i input]
+               #(work i))))]
     (check-all-buffer "pcalls-buffer" pmap-like true true)))
 
 (deftest test-upcalls
   (testing "basic pcalls test"
     (is (= [1 2 3 4]
-             (sort (lazy/upcalls 3 #(inc 0) #(inc 1) #(inc 2) #(inc 3))))))
+           (sort (lazy/upcalls 3 #(inc 0) #(inc 1) #(inc 2) #(inc 3))))))
   (letfn [(pmap-like [pool work input]
             (apply
-              lazy/upcalls
-              pool
-              (for [i input]
-                #(work i))))]
+             lazy/upcalls
+             pool
+             (for [i input]
+               #(work i))))]
     (check-all "upcalls" pmap-like false true)))
 
 (deftest test-upcalls-buffer
   (letfn [(pmap-like [pool buffer work input]
             (apply
-              lazy/upcalls-buffer
-              pool buffer
-              (for [i input]
-                #(work i))))]
+             lazy/upcalls-buffer
+             pool buffer
+             (for [i input]
+               #(work i))))]
     (check-all-buffer "upcalls-buffer" pmap-like false true)))
 
 (deftest test-pvalues
@@ -152,25 +151,25 @@
            (lazy/pvalues 3 (inc 0) (inc 1) (inc 2) (inc 3)))))
   (letfn [(pmap-like [pool work input]
             (let [worksym (gensym "work")]
-              ((eval
-                 `(fn [pool# ~worksym]
-                    (lazy/pvalues
-                      pool#
-                      ~@(for [i input]
-                          (list worksym i)))))
-                 pool work)))]
+              ((th/eval+ex-unwrap
+                `(fn [pool# ~worksym]
+                   (lazy/pvalues
+                    pool#
+                    ~@(for [i input]
+                        (list worksym i)))))
+               pool work)))]
     (check-all "pvalues" pmap-like true false)))
 
 (deftest test-pvalues-buffer
   (letfn [(pmap-like [pool buffer work input]
             (let [worksym (gensym "work")]
-              ((eval
-                 `(fn [pool# buffer# ~worksym]
-                    (lazy/pvalues-buffer
-                      pool# buffer#
-                      ~@(for [i input]
-                          (list worksym i)))))
-                 pool buffer work)))]
+              ((th/eval+ex-unwrap
+                `(fn [pool# buffer# ~worksym]
+                   (lazy/pvalues-buffer
+                    pool# buffer#
+                    ~@(for [i input]
+                        (list worksym i)))))
+               pool buffer work)))]
     (check-all-buffer "pvalues-buffer" pmap-like true false)))
 
 (deftest test-upvalues
@@ -179,25 +178,24 @@
            (sort (lazy/upvalues 3 (inc 0) (inc 1) (inc 2) (inc 3))))))
   (letfn [(pmap-like [pool work input]
             (let [worksym (gensym "work")]
-              ((eval
-                 `(fn [pool# ~worksym]
-                    (lazy/upvalues
-                      pool#
-                      ~@(for [i input]
-                          (list worksym i)))))
-                 pool work)))]
+              ((th/eval+ex-unwrap `(fn [pool# ~worksym]
+                                     (lazy/upvalues
+                                      pool#
+                                      ~@(for [i input]
+                                          (list worksym i)))))
+               pool work)))]
     (check-all "upvalues" pmap-like false false)))
 
 (deftest test-upvalues-buffer
   (letfn [(pmap-like [pool buffer work input]
             (let [worksym (gensym "work")]
-              ((eval
-                 `(fn [pool# buffer# ~worksym]
-                    (lazy/upvalues-buffer
-                      pool# buffer#
-                      ~@(for [i input]
-                          (list worksym i)))))
-                 pool buffer work)))]
+              ((th/eval+ex-unwrap
+                `(fn [pool# buffer# ~worksym]
+                   (lazy/upvalues-buffer
+                    pool# buffer#
+                    ~@(for [i input]
+                        (list worksym i)))))
+               pool buffer work)))]
     (check-all-buffer "upvalues-buffer" pmap-like false false)))
 
 (deftest test-pfor
@@ -206,17 +204,17 @@
            (lazy/pfor 3 [i (range 10)] (inc i)))))
   (letfn [(pmap-like [pool work input]
             (lazy/pfor
-              pool
-              [i input]
-              (work i)))]
+             pool
+             [i input]
+             (work i)))]
     (check-all "pfor" pmap-like true true)))
 
 (deftest test-pfor-buffer
   (letfn [(pmap-like [pool buffer work input]
             (lazy/pfor-buffer
-              pool buffer
-              [i input]
-              (work i)))]
+             pool buffer
+             [i input]
+             (work i)))]
     (check-all-buffer "pfor-buffer" pmap-like true true)))
 
 (deftest test-upfor
@@ -225,26 +223,26 @@
            (sort (lazy/pfor 3 [i (range 10)] (inc i))))))
   (letfn [(pmap-like [pool work input]
             (lazy/upfor
-              pool
-              [i input]
-              (work i)))]
+             pool
+             [i input]
+             (work i)))]
     (check-all "upfor" pmap-like false true)))
 
 (deftest test-upfor-buffer
   (letfn [(pmap-like [pool buffer work input]
             (lazy/upfor-buffer
-              pool buffer
-              [i input]
-              (work i)))]
+             pool buffer
+             [i input]
+             (work i)))]
     (check-all-buffer "upfor-buffer" pmap-like false true)))
 
 (deftest test-pdoseq
   (cptest/test-parallel-do
-    "pdoseq"
-    (fn [pool f s]
-        (lazy/pdoseq pool [i s] (f i)))))
+   "pdoseq"
+   (fn [pool f s]
+     (lazy/pdoseq pool [i s] (f i)))))
 
 (deftest test-prun!
   (cptest/test-parallel-do
-    "prun!"
-    (fn [pool f s] (lazy/prun! pool f s))))
+   "prun!"
+   (fn [pool f s] (lazy/prun! pool f s))))
