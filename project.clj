@@ -12,12 +12,17 @@
 ;; and limitations under the License.
 
 (defproject org.clj-commons/claypoole
-  "1.2.0-SNAPSHOT"
+  (or (System/getenv "PROJECT_VERSION") "1.2.0")
   :description "Claypoole: Threadpool tools for Clojure."
   :url "https://github.com/clj-commons/claypoole"
   :license {:name "Apache License Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"
             :distribution :repo}
+  :deploy-repositories [["clojars" {:url "https://repo.clojars.org"
+                                    :username :env/clojars_username
+                                    :password :env/clojars_password
+                                    :sign-releases true}]]
+
   :min-lein-version "2.0.0"
   :source-paths ["src/clj"]
   :java-source-paths ["src/java"]
