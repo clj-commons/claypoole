@@ -12,3 +12,4 @@ pom.xml
 .portal
 .cache
 .cpcache
+**/.calva/output-window

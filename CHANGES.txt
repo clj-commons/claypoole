@@ -1,11 +1,12 @@
 CHANGES
 
-Unreleased
+1.2.2
 
 - Change group-id to org.clj-commons
 - Build using openjdk-8 and switched to 1.8 compile version.
 - Added deps.edn - support for tools-deps
 - Fix CLJ-2619 equivalent bug in claypoole (thanks Mike Kaplinskiy - mikekap)
+- CI tests use clojure versions 1.9.x, 1.10.x and 1.11.x https://github.com/clj-commons/claypoole/issues/57
 
 1.1.3
 

@@ -1,1 +1,1 @@
-{:deps {io.github.clj-commons/claypoole {:git/sha "caf3e5a69c070ba9eb8adf38c2d6d9d66562d69a"}}}
+{:deps {org.clj-commons/claypoole {:mvn/version "1.2.2"}}}

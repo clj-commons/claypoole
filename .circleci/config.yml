@@ -56,8 +56,15 @@ jobs:
           name: Ensure No Reflection Warnings
           command: "! lein check 2>&1 | grep 'Reflection warning'"
 
-      # run tests!
-      - run: lein do clean, test
+      - run:
+          name: Run tests with clojure 1.9
+          command: lein with-profile clojure-1.9 do clean, test
+      - run:
+          name: Run tests with clojure 1.10
+          command: lein with-profile clojure-1.10 do clean, test
+      - run:
+          name: Run tests with clojure 1.11
+          command: lein with-profile clojure-1.11 do clean, test
 
   deploy:
     docker:
