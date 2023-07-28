@@ -9,7 +9,9 @@ pom.xml
 /lib/
 /target/
 .lein-deps-sum
-.portal
+.clj-kondo/.cache
+.lsp/.cache
+.portal/vs-code.edn
 .cache
 .cpcache
 **/.calva/output-window
