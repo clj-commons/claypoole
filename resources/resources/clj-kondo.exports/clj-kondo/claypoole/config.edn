@@ -1,0 +1,18 @@
+{:linters {:claypoole {:level :warning}}
+ :lint-as {com.climate.claypoole/with-shutdown! clojure.core/let}
+ :hooks   {:analyze-call {com.climate.claypoole/future             clj-kondo.claypoole/future
+                          com.climate.claypoole/completable-future clj-kondo.claypoole/completable-future
+                          com.climate.claypoole/pdoseq             clj-kondo.claypoole/pdoseq
+                          com.climate.claypoole/pmap               clj-kondo.claypoole/pmap
+                          com.climate.claypoole/upmap              clj-kondo.claypoole/upmap
+                          com.climate.claypoole/pvalues            clj-kondo.claypoole/pvalues
+                          com.climate.claypoole/upvalues           clj-kondo.claypoole/upvalues
+                          com.climate.claypoole/pfor               clj-kondo.claypoole/pfor
+                          com.climate.claypoole/upfor              clj-kondo.claypoole/upfor
+                          com.climate.claypoole.lazy/pdoseq        clj-kondo.claypoole/pdoseq
+                          com.climate.claypoole.lazy/pmap          clj-kondo.claypoole/pmap
+                          com.climate.claypoole.lazy/upmap         clj-kondo.claypoole/upmap
+                          com.climate.claypoole.lazy/pvalues       clj-kondo.claypoole/pvalues
+                          com.climate.claypoole.lazy/upvalues      clj-kondo.claypoole/upvalues
+                          com.climate.claypoole.lazy/pfor          clj-kondo.claypoole/pfor
+                          com.climate.claypoole.lazy/upfor         clj-kondo.claypoole/upfor}}}

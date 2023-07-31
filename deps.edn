@@ -1,4 +1,4 @@
-{:paths ["src/clj" "target/classes"]
+{:paths ["resources" "src/clj" "target/classes"]
  :deps {}
  :deps/prep-lib {:alias :build
                  :fn compile
