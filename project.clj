@@ -25,6 +25,7 @@
 
   :min-lein-version "2.0.0"
   :source-paths ["src/clj"]
+  :resource-paths ["resources"]
   :java-source-paths ["src/java"]
   :pedantic? :warn
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.3"]]}
